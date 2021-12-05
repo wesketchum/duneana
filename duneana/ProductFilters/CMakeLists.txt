@@ -8,20 +8,20 @@ art_make( BASENAME_ONLY
          larsim_MCCheater_BackTrackerService_service
          larsim_MCCheater_ParticleInventoryService_service
          lardata_Utilities
-			   nurandom_RandomUtils_NuRandomService_service
-			   nusimdata_SimulationBase
+			   nurandom::RandomUtils_NuRandomService_service
+			   nusimdata::SimulationBase
  			   ART_FRAMEWORK_CORE
 			   ART_FRAMEWORK_PRINCIPAL
 			   ART_FRAMEWORK_SERVICES_REGISTRY
 			   ART_ROOT_IO_TFILE_SUPPORT
 			   ROOT::Core
 			   ART_ROOT_IO_TFILESERVICE_SERVICE
-			   art_Persistency_Common canvas
-			   art_Utilities canvas
+			   art::Persistency_Common canvas
+			   art::Utilities canvas
 			   messagefacility::MF_MessageLogger
 			   
-	       FHICLCPP
-			   cetlib cetlib_except
+	       fhiclcpp::fhiclcpp
+			   cetlib::cetlib cetlib_except
          ROOT_BASIC_LIB_LIST
          ROOT_GEOM
          )
