@@ -2,7 +2,7 @@ BEGIN_PROLOG
 
 dune35t_analysistree:
 { 
- module_type:                 "dune/AnaTree/AnalysisTree"
+ module_type:                 "AnalysisTree"
  DigitModuleLabel:            "daq"
  HitsModuleLabel:             "linecluster"
  LArGeantModuleLabel:         "largeant"
