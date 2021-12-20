@@ -4560,6 +4560,10 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
            }*/
 
         // find particle ID info
+        /*
+        // Note from Jake Calcutt: There has been a breaking change in the definition
+        // of the anab::ParticleID class. If you are using this class and want this info
+        // in this tree, these must be updated
         art::FindMany<anab::ParticleID> fmpid(trackListHandle[iTracker], evt, fParticleIDModuleLabel[iTracker]);
         if(fmpid.isValid()) {
           std::vector<const anab::ParticleID*> pids = fmpid.at(iTrk);
@@ -4582,6 +4586,7 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
             TrackerData.trkpidpida[iTrk][planenum] = pids[ipid]->PIDA();
           }
         } // fmpid.isValid()
+        */
         if(fMVAPIDTrackModuleLabel[iTracker].size()){
           art::FindOneP<anab::MVAPIDResult> fmvapid(trackListHandle[iTracker], evt, fMVAPIDTrackModuleLabel[iTracker]);
           if(fmvapid.isValid()) {
