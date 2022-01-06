@@ -7,9 +7,9 @@
 // from cetlib version v3_02_00.
 ////////////////////////////////////////////////////////////////////////
 
-#include "dune/DAQSimAna/RunningSumHitFinder/RunningSumTPFinderPass1.h"
+#include "duneana/DAQSimAna/RunningSumHitFinder/RunningSumTPFinderPass1.h"
 
-#include "dune/DAQSimAna/AlgParts.h"
+#include "duneana/DAQSimAna/AlgParts.h"
 
 #include <algorithm> // for std::transform
 #include <numeric> // for std::accumulate

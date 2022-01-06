@@ -6,9 +6,9 @@
 #include "art/Utilities/ToolMacros.h"
 #include "fhiclcpp/ParameterSet.h"
 
-#include "dune/DAQSimAna/TriggerPrimitiveFinderPass1.h"
+#include "duneana/DAQSimAna/TriggerPrimitiveFinderPass1.h"
 
-#include "dune/DAQSimAna/AlgParts.h"
+#include "duneana/DAQSimAna/AlgParts.h"
 
 #include <algorithm> // for std::transform
 

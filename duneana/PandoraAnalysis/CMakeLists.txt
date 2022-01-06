@@ -13,10 +13,10 @@ art_make( MODULE_LIBRARIES larcorealg_Geometry
     	  lardata_ArtDataHelper
 	  larreco_RecoAlg
 	  larpandora_LArPandoraInterface
-	  SignalShapingServiceDUNE10kt_service
-	  SignalShapingServiceDUNE35t_service
+	  dunecore::SignalShapingServiceDUNE10kt_service
+	  dunecore::SignalShapingServiceDUNE35t_service
           nusimdata::SimulationBase
-	  dune_AnaUtils
+	  dunereco_AnaUtils
           ART_FRAMEWORK_CORE
 	  ART_FRAMEWORK_PRINCIPAL
 	  ART_FRAMEWORK_SERVICES_REGISTRY

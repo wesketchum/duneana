@@ -21,7 +21,7 @@
 #include "larcore/Geometry/Geometry.h"
 #include "lardata/ArtDataHelper/HitCreator.h"
 
-#include "dune/DAQSimAna/RunningSumHitFinder/RunningSumTPFinderTool.h"
+#include "duneana/DAQSimAna/RunningSumHitFinder/RunningSumTPFinderTool.h"
 
 #include <memory>
 

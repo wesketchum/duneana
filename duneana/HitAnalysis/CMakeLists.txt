@@ -10,7 +10,7 @@ art_make(BASENAME_ONLY
          nusimdata::SimulationBase
 	 larsim_MCCheater_BackTrackerService_service
            larsim_MCCheater_ParticleInventoryService_service
-	 HitFinderDUNE
+	 dunereco::HitFinderDUNE
          ART_FRAMEWORK_CORE
 	 ART_FRAMEWORK_PRINCIPAL
 	 ART_FRAMEWORK_SERVICES_REGISTRY

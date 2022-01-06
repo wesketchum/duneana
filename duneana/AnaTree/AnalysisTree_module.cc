@@ -78,7 +78,7 @@
 #include "larreco/SpacePointSolver/Solver.h"
 
 #include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
-#include "dune/OpticalDetector/OpFlashSort.h"
+#include "duneopdet/OpticalDetector/OpFlashSort.h"
 
 #include "lardata/ArtDataHelper/MVAReader.h"
 

@@ -1,6 +1,6 @@
 
 cet_build_plugin(DuneEventFilter art::module
-			dune_ArtSupport
+			dunecore_ArtSupport
 			lardataobj_RawData
                         lardataobj_RecoBase
 	                larcorealg_Geometry

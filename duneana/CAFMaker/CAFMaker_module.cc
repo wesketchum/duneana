@@ -27,11 +27,11 @@
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "nusimdata/SimulationBase/MCFlux.h"
 #include "larcoreobj/SummaryData/POTSummary.h"
-#include "dune/FDSensOpt/FDSensOptData/MVASelectPID.h"
-#include "dune/FDSensOpt/FDSensOptData/EnergyRecoOutput.h"
-#include "dune/CVN/func/InteractionType.h"
-#include "dune/CVN/func/Result.h"
-#include "dune/RegCNN/func/RegCNNResult.h"
+#include "dunereco/FDSensOpt/FDSensOptData/MVASelectPID.h"
+#include "dunereco/FDSensOpt/FDSensOptData/EnergyRecoOutput.h"
+#include "dunereco/CVN/func/InteractionType.h"
+#include "dunereco/CVN/func/Result.h"
+#include "dunereco/RegCNN/func/RegCNNResult.h"
 
 // dunerw stuff
 #include "systematicstools/interface/ISystProviderTool.hh"

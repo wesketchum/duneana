@@ -5,7 +5,7 @@
 #include "art/Utilities/ToolMacros.h"
 #include "fhiclcpp/ParameterSet.h"
 
-#include "dune/DAQSimAna/RunningSumHitFinder/RunningSumTPFinderTool.h"
+#include "duneana/DAQSimAna/RunningSumHitFinder/RunningSumTPFinderTool.h"
 
 class RunningSumTPFinderPass3 : public RunningSumTPFinderTool {
  public:

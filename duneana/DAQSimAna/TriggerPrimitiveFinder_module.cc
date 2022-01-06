@@ -21,7 +21,7 @@
 #include "larcore/Geometry/Geometry.h"
 #include "lardata/ArtDataHelper/HitCreator.h"
 
-#include "dune/DAQSimAna/TriggerPrimitiveFinderTool.h"
+#include "duneana/DAQSimAna/TriggerPrimitiveFinderTool.h"
 
 #include <memory>
 

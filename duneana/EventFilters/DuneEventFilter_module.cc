@@ -24,9 +24,9 @@
 #include <vector>
 #include <set>
 
-#include "dune/DuneInterface/Tool/IndexRangeTool.h"
-#include "dune/DuneInterface/Tool/IndexVectorMapTool.h"
-#include "dune/ArtSupport/DuneToolManager.h"
+#include "dunecore/DuneInterface/Tool/IndexRangeTool.h"
+#include "dunecore/DuneInterface/Tool/IndexVectorMapTool.h"
+#include "dunecore/ArtSupport/DuneToolManager.h"
 #include "art/Framework/Core/EDFilter.h" 
 #include "art/Framework/Core/ModuleMacros.h" 
 #include "art/Framework/Principal/Event.h" 

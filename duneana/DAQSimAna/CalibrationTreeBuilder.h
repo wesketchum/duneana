@@ -9,8 +9,8 @@
 #define CALIBRATIONTREEBUILDER_H
 
 //Includes
-#include "dune/DuneObj/CalibTreeRecord.h"
-#include "dune/DuneObj/OpDetDivRec.h"
+#include "dunecore/DuneObj/CalibTreeRecord.h"
+#include "dunecore/DuneObj/OpDetDivRec.h"
 
 //LArSoft Includes
 #include "lardataobj/RecoBase/Track.h"

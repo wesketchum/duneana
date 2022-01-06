@@ -69,7 +69,7 @@ cet_build_plugin(CAFMaker   art::module
                         systematicstools_interface
 			systematicstools_interpreters
 			systematicstools_utility
-                        dune_CVN_func
+                        dunereco_CVN_func
               BASENAME_ONLY
 )
 

@@ -2,7 +2,7 @@ include(MakeDuneToolBuilder)
 add_subdirectory(SNAnaClustering)
 add_subdirectory(RunningSumHitFinder)
 
-make_dune_tool_builder(dune::TriggerPrimitiveFinderTool)
+make_dune_tool_builder(dunecore::TriggerPrimitiveFinderTool)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
   dune_raw_data::dune-raw-data_Services_ChannelMap_PdspChannelMapService_service
@@ -12,7 +12,7 @@ art_make( BASENAME_ONLY MODULE_LIBRARIES
   lardataobj_RawData
   lardataobj_RecoBase
   lardataobj_AnalysisBase
-  dune_DuneObj
+  dunecore_DuneObj
   larsim_MCCheater_BackTrackerService_service
   larsim_MCCheater_ParticleInventoryService_service
   larsim_MCCheater_PhotonBackTrackerService_service
@@ -43,7 +43,7 @@ cet_build_plugin(TriggerPrimitiveFinderPass1 art::tool
 cet_build_plugin(TriggerPrimitiveFinderPass2 art::tool
   fhiclcpp cetlib::cetlib cetlib_except
   
-  dune_DAQSimAna_TriggerPrimitiveFinderPass1_tool
+  duneana_DAQSimAna_TriggerPrimitiveFinderPass1_tool
 )
 
 cet_build_plugin(TriggerPrimitiveFinderTemplate art::tool

@@ -1,4 +1,4 @@
-make_dune_tool_builder(dune::RunningSumTPFinderTool)
+make_dune_tool_builder(dunecore::RunningSumTPFinderTool)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
   dune_raw_data::dune-raw-data_Services_ChannelMap_PdspChannelMapService_service
@@ -8,7 +8,7 @@ art_make( BASENAME_ONLY MODULE_LIBRARIES
   lardataobj_RawData
   lardataobj_RecoBase
   lardataobj_AnalysisBase
-  dune_DuneObj
+  dunecore_DuneObj
   larsim_MCCheater_BackTrackerService_service
   larsim_MCCheater_ParticleInventoryService_service
   larsim_MCCheater_PhotonBackTrackerService_service

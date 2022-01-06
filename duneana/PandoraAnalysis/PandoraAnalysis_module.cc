@@ -32,10 +32,10 @@
 #include "larsim/Utils/TruthMatchUtils.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
-#include "dune/AnaUtils/DUNEAnaEventUtils.h"
-#include "dune/AnaUtils/DUNEAnaPFParticleUtils.h"
-#include "dune/AnaUtils/DUNEAnaTrackUtils.h"
-#include "dune/AnaUtils/DUNEAnaShowerUtils.h"
+#include "dunereco/AnaUtils/DUNEAnaEventUtils.h"
+#include "dunereco/AnaUtils/DUNEAnaPFParticleUtils.h"
+#include "dunereco/AnaUtils/DUNEAnaTrackUtils.h"
+#include "dunereco/AnaUtils/DUNEAnaShowerUtils.h"
 
 #include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
 
