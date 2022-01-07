@@ -26,16 +26,18 @@ product          version
 cetbuildtools	 v8_18_09	-	only_for_build
 dunereco         v09_41_00_02
 duneopdet        v09_41_00_02
+duneanaobj       v01_01_01
+larcoreobj       v09_04_00
 end_product_list
 
 
 # We now define allowed qualifiers and the corresponding qualifiers for the depdencies.
 # Make a table by adding columns before "notes".
-qualifier      dunereco   duneopdet       notes
-c7:debug       c7:debug   c7:debug    
-c7:prof        c7:prof    c7:prof     
-e20:debug      e20:debug  e20:debug   
-e20:prof       e20:prof   e20:prof    
+qualifier      dunereco   duneopdet  duneanaobj     larcoreobj  notes
+c7:debug       c7:debug   c7:debug   c7:gv3:debug   c7:debug
+c7:prof        c7:prof    c7:prof    c7:gv3:prof    c7:prof
+e20:debug      e20:debug  e20:debug  e20:gv3:debug  e20:debug
+e20:prof       e20:prof   e20:prof   e20:gv3:prof   e20:prof
 end_qualifier_list
 
 # Preserve tabs and formatting in emacs and vi / vim:
