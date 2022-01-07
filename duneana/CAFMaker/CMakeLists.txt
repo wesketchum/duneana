@@ -29,7 +29,7 @@ cet_build_plugin(CAFMaker   art::module
 			GPHDISXS
 			GPHCHMXS
 			GPHCOHEG
-      GPHCOHXS
+			GPHCOHXS
 			GPHDFRCEG
 			GPHDISEG
 			GPHXSIG
@@ -46,11 +46,11 @@ cet_build_plugin(CAFMaker   art::module
 			GFWINT
 			GPHQELXS
 			GPHMNUCEG
-      GPHMNUCXS
+			GPHMNUCXS
 			GPHAMNGEG
-      GPHAMNGXS
+			GPHAMNGXS
 			GPHNUELEG
-      GPHNUELXS
+			GPHNUELXS
 			GFWNTP
 			GPHNUCLST
 			GFWNUM
@@ -58,7 +58,7 @@ cet_build_plugin(CAFMaker   art::module
 			GPHPDF
 			GPHQELEG
 			GPHRESEG
-      GPHRESXS
+			GPHRESXS
 			GFWREG
 			GPHRESXS
 			GFWUTL
@@ -70,7 +70,7 @@ cet_build_plugin(CAFMaker   art::module
                         systematicstools_interface
 			systematicstools_interpreters
 			systematicstools_utility
-                        dune_CVN_func
+                        dunereco_CVN_func
               BASENAME_ONLY
 )
 
