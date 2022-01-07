@@ -4,6 +4,7 @@ include_directories ( $ENV{GENIE_INC}/GENIE )
 ##cet_find_library( SYSTTOOLS NAMES systematicstools_interface systematicstools_interpreters systematicstools_utility PATHS ENV SYSTEMATICSTOOLS_LIB NO_DEFAULT_PATH )
 
 cet_build_plugin(CAFMaker   art::module
+                        duneanaobj_StandardRecord
                         nugen::NuReweight
                         nugen::NuReweight_art
 			nusimdata::SimulationBase
@@ -69,7 +70,7 @@ cet_build_plugin(CAFMaker   art::module
                         systematicstools_interface
 			systematicstools_interpreters
 			systematicstools_utility
-                        dunereco_CVN_func
+                        dune_CVN_func
               BASENAME_ONLY
 )
 
