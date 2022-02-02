@@ -24,8 +24,8 @@ defaultqual e20
 
 product          version
 cetbuildtools	 v8_18_09	-	only_for_build
-dunereco         v09_42_00_01
-duneopdet        v09_42_00_01
+dunereco         v09_42_02_00
+duneopdet        v09_42_02_00
 end_product_list
 
 
