@@ -1,11 +1,11 @@
 
 cet_build_plugin(DuneEventFilter art::module
-			dunecore_ArtSupport
-			lardataobj_RawData
-                        lardataobj_RecoBase
-	                larcorealg_Geometry
-	                larcore_Geometry_Geometry_service
-                        lardata_Utilities    
+			dunecore::ArtSupport
+			lardataobj::RawData
+                        lardataobj::RecoBase
+	                larcorealg::Geometry
+	                larcore::Geometry_Geometry_service
+                        lardata::Utilities    
                         ART_FRAMEWORK_CORE
 			ART_FRAMEWORK_PRINCIPAL
 			ART_FRAMEWORK_SERVICES_REGISTRY
