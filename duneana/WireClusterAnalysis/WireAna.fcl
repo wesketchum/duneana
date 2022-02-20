@@ -1,0 +1,14 @@
+BEGIN_PROLOG
+
+standard_wireana:
+{
+  module_type:	WireAna
+  #====================
+  InputWireProducerLabel:       "caldata"
+  LogLevel: 10
+  DoAssns: false
+  ChannelPerApa: 2560
+  TickesPerWire: 6000
+}
+
+END_PROLOG
