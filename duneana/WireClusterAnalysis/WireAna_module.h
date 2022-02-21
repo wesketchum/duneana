@@ -26,6 +26,7 @@
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/RecoBase/PFParticle.h"
+#include "lardataobj/Simulation/SimChannel.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "lardataobj/AnalysisBase/CosmicTag.h"
@@ -132,13 +133,18 @@ private:
   int fMinClusterSize;
 
   /////////////////////////////////////////////
+  // Backtracker services
+
+  /////////////////////////////////////////////
   // config
   int fLogLevel;
   bool fDoAssns;
+  bool fIsMC;
 
   /////////////////////////////////////////////
   // Wire Filtering/Clustering Functions
-  void SortWirePtrByChannel( std::vector<art::Ptr<recob::Wire>> &vec, bool increasing );
+  template<class T>
+  void SortWirePtrByChannel( std::vector<art::Ptr<T>> &vec, bool increasing );
   std::vector<wireana::wirecluster> BuildInitialClusters( std::vector<art::Ptr<recob::Wire>> &vec, int dW, int dTick );
   std::vector<wireana::roicluster> BuildInitialROIClusters( std::vector<art::Ptr<recob::Wire>> &vec, int dW, int dTick );
   std::vector<art::Ptr<recob::Wire>> FilterWires(std::vector<art::Ptr<recob::Wire>> &vec, int dC1, int dT1, int dCn, int dTn );
@@ -163,6 +169,7 @@ private:
   /////////////////////////////////////////////
   //Module Labels and Settting
   const art::InputTag fWireProducerLabel; 
+  const art::InputTag fSimChannelLabel;
 
 
   /////////////////////////////////////////////

@@ -30,6 +30,7 @@ namespace wireana{
   using recob::Wire;
   using recob::Hit;
 
+  enum PType{ kUnknown=0, kMarl, kAPA, kCPA, kAr39, kAr42, kNeutron, kKryp, kPlon, kRdon, kNPTypes };
   enum EType{
     kES,
     kCC,

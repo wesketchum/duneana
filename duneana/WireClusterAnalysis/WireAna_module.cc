@@ -4,12 +4,14 @@
 
 wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
   : EDAnalyzer{pset}  ,
-  fWireProducerLabel(pset.get< art::InputTag >("InputWireProducerLabel"))
+  fWireProducerLabel(pset.get< art::InputTag >("InputWireProducerLabel")),
+  fSimChannelLabel(pset.get< art::InputTag >("InputSimChannelLabel", "elecDrift"))
 {
   fLogLevel           = pset.get<int>("LogLevel", 10);
   fDoAssns            = pset.get<bool>("DoAssns", false);
   fNChanPerApa        = pset.get<int>("ChannelPerApa", 2560);
   fNTicksPerWire      = pset.get<int>("TickesPerWire", 6000);
+  fIsMC               = pset.get<bool>("IsMC", true);
   auto const* geo = lar::providerFrom<geo::Geometry>();
   fNPlanes = geo->Nplanes();
 
@@ -32,14 +34,37 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   art::Handle<std::vector<recob::Wire>> wireListHandle;
   std::vector<art::Ptr<recob::Wire>> wirelist;
   if (evt.getByLabel(fWireProducerLabel, wireListHandle)) art::fill_ptr_vector(wirelist, wireListHandle);
+  art::Handle<std::vector<sim::SimChannel>> simChannelListHandle;
+  std::vector<art::Ptr<sim::SimChannel>> channellist;
+  std::vector<int> matchedChannelID;
+  if (evt.getByLabel(fSimChannelLabel, simChannelListHandle)) art::fill_ptr_vector(channellist, simChannelListHandle);
 
   //First sort wires by channel:
   SortWirePtrByChannel( wirelist, true );
+  SortWirePtrByChannel( channellist, true );
+
+  //Get channel-> wire,simchannel map
+  std::map<raw::ChannelID_t, std::pair<art::Ptr<recob::Wire>, art::Ptr<sim::SimChannel>>> ch_w_sc;
+  for( auto w: wirelist ) ch_w_sc[ w->Channel() ].first = w;
+  for( auto w: channellist )
+  {
+    raw::ChannelID_t c = w->Channel();
+    if ( ch_w_sc.find( c ) != ch_w_sc.end() ) ch_w_sc[c].second = w;
+  }
+
+  //We can now print truth particles
+
 
   std::vector<wireana::wirecluster> clusters = BuildInitialClusters( wirelist, 0, 0 );
   //PrintClusters( clusters );
 
-  BuildInitialROIClusters( wirelist, 0, 0 );
+  std::vector<wireana::roicluster> roi_clusters = BuildInitialROIClusters( wirelist, 0, 0 );
+
+  if (fIsMC)
+  {
+    //Fill Truth info to roicluster
+
+  }
 
   truth_data.truth_intType = 1;
 
@@ -147,18 +172,21 @@ void wireana::WireAna::FillTruthBranches(art::Event const& evt, TTree*t, DataBlo
 
 }
 
-void 
-wireana::WireAna::SortWirePtrByChannel( std::vector<art::Ptr<recob::Wire>> &vec, bool increasing )
+template<class T>
+void wireana::WireAna::SortWirePtrByChannel( std::vector<art::Ptr<T>> &vec, bool increasing )
 {
   if (increasing)
   {
-    std::sort(vec.begin(), vec.end(), [](art::Ptr<recob::Wire> &a, art::Ptr<recob::Wire> &b) { return a->Channel() < b->Channel(); });
+    std::sort(vec.begin(), vec.end(), [](art::Ptr<T> &a, art::Ptr<T> &b) { return a->Channel() < b->Channel(); });
   }
   else
   {
-    std::sort(vec.begin(), vec.end(), [](art::Ptr<recob::Wire> &a, art::Ptr<recob::Wire> &b) { return a->Channel() > b->Channel(); });
+    std::sort(vec.begin(), vec.end(), [](art::Ptr<T> &a, art::Ptr<T> &b) { return a->Channel() > b->Channel(); });
   }
 }
+
+template void wireana::WireAna::SortWirePtrByChannel<>( std::vector<art::Ptr<recob::Wire>> &vec, bool increasing );
+template void wireana::WireAna::SortWirePtrByChannel<>( std::vector<art::Ptr<sim::SimChannel>> &vec, bool increasing );
 
 std::vector<wireana::wirecluster> 
 wireana::WireAna::BuildInitialClusters( std::vector<art::Ptr<recob::Wire>> &vec, int dC, int dTick )
@@ -192,6 +220,8 @@ wireana::WireAna::BuildInitialClusters( std::vector<art::Ptr<recob::Wire>> &vec,
   //each wirecluster contains set of wires adjacent to each other
   return ret;
 }
+
+
 
 bool 
 wireana::WireAna::HasHit( const art::Ptr<recob::Wire> &wire, int minTick )
