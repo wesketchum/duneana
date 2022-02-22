@@ -26,6 +26,9 @@ namespace wireana{
   using cheat::ParticleInventoryService;
 
   using simb::MCParticle;
+  using sim::SimChannel;
+
+  using detinfo::DetectorClocksData;
 
   using recob::Wire;
   using recob::Hit;
@@ -110,13 +113,18 @@ namespace wireana{
       if(denum!=0) return num/denum;
       else return -999;
     }
+    std::string label;
+    std::vector< std::pair<int, double> > pdg_energy_list;
   };
 
 
 
   struct roicluster{
     int nWires;
+    std::string mainlabel;
+    std::vector< std::pair<int, double> > pdg_energy_list;
     std::vector< roi > ROIs;
+
   };
 
 

@@ -4,25 +4,32 @@
 
 wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
   : EDAnalyzer{pset}  ,
-  fWireProducerLabel(pset.get< art::InputTag >("InputWireProducerLabel")),
-  fSimChannelLabel(pset.get< art::InputTag >("InputSimChannelLabel", "elecDrift"))
+  fWireProducerLabel(pset.get< art::InputTag >("InputWireProducerLabel", "caldata")),
+  fSimChannelLabel(pset.get< art::InputTag >("SimChannelLabel", "elecDrift")),
+  fSimulationProducerLabel(pset.get< art::InputTag >("SimulationProducerLabel", "largeant"))
 {
   fLogLevel           = pset.get<int>("LogLevel", 10);
   fDoAssns            = pset.get<bool>("DoAssns", false);
   fNChanPerApa        = pset.get<int>("ChannelPerApa", 2560);
   fNTicksPerWire      = pset.get<int>("TickesPerWire", 6000);
-  fIsMC               = pset.get<bool>("IsMC", true);
   auto const* geo = lar::providerFrom<geo::Geometry>();
   fNPlanes = geo->Nplanes();
 
+  fMinPts  =  pset.get<unsigned int>("DBSCAN_MinPts", 2);
+  fEps     =  pset.get<float>("DBSCAN_Eps", 4.5);
+  fDrift   =  pset.get<float>("DBSCAN_Drift", 1.6);
+  fPitch   =  pset.get<float>("DBSCAN_Pitch", 3.0);
 
 }
 
 void wireana::WireAna::analyze(art::Event const & evt) {
   //reset containers
   reset();
+  //get detector property
+  auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
+  auto const detProp = art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
 
-
+  //get event data
   run = evt.run();
   subrun = evt.subRun();
   event = evt.id().event();
@@ -31,40 +38,75 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   if( !evt.isRealData() ) MC = 1;
   else MC = 0;
 
+  ////////////////////////////////////////////////////////////
+  //Build Wire SimChanel List
+  //parse Wire/SimChannel Info
   art::Handle<std::vector<recob::Wire>> wireListHandle;
   std::vector<art::Ptr<recob::Wire>> wirelist;
-  if (evt.getByLabel(fWireProducerLabel, wireListHandle)) art::fill_ptr_vector(wirelist, wireListHandle);
+  if (evt.getByLabel(fWireProducerLabel, wireListHandle)) 
+    art::fill_ptr_vector(wirelist, wireListHandle);
+
   art::Handle<std::vector<sim::SimChannel>> simChannelListHandle;
   std::vector<art::Ptr<sim::SimChannel>> channellist;
-  std::vector<int> matchedChannelID;
-  if (evt.getByLabel(fSimChannelLabel, simChannelListHandle)) art::fill_ptr_vector(channellist, simChannelListHandle);
+  if (evt.getByLabel(fSimChannelLabel, simChannelListHandle)) 
+    art::fill_ptr_vector(channellist, simChannelListHandle);
 
-  //First sort wires by channel:
+  // //sort wires and channels list by channel:
   SortWirePtrByChannel( wirelist, true );
   SortWirePtrByChannel( channellist, true );
 
-  //Get channel-> wire,simchannel map
+  // //Get channel-> wire,simchannel map
   std::map<raw::ChannelID_t, std::pair<art::Ptr<recob::Wire>, art::Ptr<sim::SimChannel>>> ch_w_sc;
-  for( auto w: wirelist ) ch_w_sc[ w->Channel() ].first = w;
+  for( auto w: wirelist ) 
+    ch_w_sc[ w->Channel() ].first = w;
   for( auto w: channellist )
-  {
-    raw::ChannelID_t c = w->Channel();
-    if ( ch_w_sc.find( c ) != ch_w_sc.end() ) ch_w_sc[c].second = w;
-  }
+    if ( ch_w_sc.find( w->Channel() ) != ch_w_sc.end() ) ch_w_sc[ w->Channel() ].second = w;
 
   //We can now print truth particles
 
+  ////////////////////////////////////////////////////////////
+  //Build trackid -> truth particle map
+  //parse MCParticles
+  art::Handle<std::vector<simb::MCParticle>> particleHandle;
+  if (!evt.getByLabel(fSimulationProducerLabel, particleHandle)) {
+    throw cet::exception("AnalysisExample")
+      << " No simb::MCParticle objects in this event - "
+      << " Line " << __LINE__ << " in file " << __FILE__ << std::endl;
+  } 
+  art::Handle<art::Assns<simb::MCTruth,simb::MCParticle,sim::GeneratedParticleInfo>> assnTruthHandle;
+  if (!evt.getByLabel(fSimulationProducerLabel, assnTruthHandle)) {
+    throw cet::exception("AnalysisExample")
+      << " No Assns objects in this event - "
+      << " Line " << __LINE__ << " in file " << __FILE__ << std::endl;
+  } 
 
-  std::vector<wireana::wirecluster> clusters = BuildInitialClusters( wirelist, 0, 0 );
-  //PrintClusters( clusters );
+  /////////////////////////////////////////////////////////////
+  // Get MCTruth handle
+  // Get Trackid->generator info
+  auto mcHandles = evt.getMany<std::vector<simb::MCTruth>>();
+  std::map< art::Ptr<simb::MCParticle>, std::string> part_to_label_map;
+  for (auto const& mcHandle : mcHandles) {
+    const std::string& sModuleLabel = mcHandle.provenance()->moduleLabel();
+    art::FindManyP<simb::MCParticle> findMCParts(mcHandle, evt, fSimulationProducerLabel);
+    std::vector<art::Ptr<simb::MCParticle>> mcParts = findMCParts.at(0);
+    for (const art::Ptr<simb::MCParticle> ptr : mcParts) {
+      part_to_label_map[ptr] = sModuleLabel;
+    }
+  }
 
+  //std::cout<<std::endl;
+  //for( auto p: part_to_label_map ) std::cout<<p.second<<std::endl;
+  //std::cout<<std::endl;
+
+  //std::vector<wireana::wirecluster> clusters = BuildInitialClusters( wirelist, 0, 0 );
+  
+  /////////////////////////////////////////////////////////////
+  // Build ROICluster
   std::vector<wireana::roicluster> roi_clusters = BuildInitialROIClusters( wirelist, 0, 0 );
 
-  if (fIsMC)
-  {
-    //Fill Truth info to roicluster
-
-  }
+  /////////////////////////////////////////////////////////////
+  // Build ROICluster
+  // Set Truth Info on roicluster
 
   truth_data.truth_intType = 1;
 
@@ -95,6 +137,7 @@ void wireana::WireAna::endJob()
 void wireana::WireAna::reset()
 {
   ResetTruthBranches(this->truth_data);
+  ch_w_sc.clear();
 }
 
 
@@ -263,10 +306,12 @@ wireana::WireAna::BuildInitialROIClusters( std::vector<art::Ptr<recob::Wire>> &w
     int planeID = chan/fNChanPerApa;
     recob::Wire::RegionsOfInterest_t signalROI = wire->SignalROI();
     for ( auto datarange: signalROI.get_ranges() ) {
-      plane_view_roi_map[planeID][wire->View()].push_back(wireana::roi( wire, datarange ) );
-    }
-      //allROIs.push_back( wireana::roi( wire, datarange ) );
+      wireana::roi thisroi( wire, datarange );
+      //Truth Operation Here:
 
+      //Push ROI
+      plane_view_roi_map[planeID][wire->View()].push_back( thisroi );
+    }
   }
 
   for( auto p: plane_view_roi_map )
@@ -275,13 +320,12 @@ wireana::WireAna::BuildInitialROIClusters( std::vector<art::Ptr<recob::Wire>> &w
     std::cout<<"Print Plane: "<< p.first <<std::endl;
     for( auto v: p.second )
     {
-      scanner.SetParameters(v.second,2,4.5,1.6,3.0);
+      scanner.SetParameters(v.second, fMinPts, fEps, fDrift, fPitch );
       scanner.run();
       std::cout<<"    View: "<<v.first<<std::endl;
       //PrintROIs( scanner.GetROIs() );
       PrintROIs( v.second );
     }
-
   }
   return ret;
 
@@ -302,9 +346,48 @@ wireana::WireAna::PrintROIs( std::vector<wireana::roi> &ROIs)
         )
       <<std::endl;
   }
-
 }
 
+void
+wireana::WireAna::TagROITruth( wireana::roi &roi, bool MC, detinfo::DetectorClocksData &clock )
+{
+  if (!MC) return;
+
+  //art::Ptr<recob:Wire> &wire = (art::Ptr<recob:Wire>) roi.wire;
+  int roi_channel = roi.wire->Channel();
+  art::Ptr<sim::SimChannel> simchannel = ch_w_sc[ roi_channel ].second;
+  //Get the TPC time from the ticks in the ROI datarange_t
+  double startTDC = clock.TPCTick2TDC( roi.begin_index );
+  double endTDC   = clock.TPCTick2TDC( roi.end_index );
+  std::vector< sim::IDE >  ide_vec = simchannel->TrackIDsAndEnergies(startTDC, endTDC);
+
+  //pair<trkid, pair<numElectrons, energy>> , sum up n electrons and total energy within the ROI
+  std::vector< std::pair< int, std::pair<float,float> > > trkID_sum; 
+
+  //fill vector of ide
+  for( auto ide : ide_vec ) 
+  {
+    auto it = trkID_sum.begin();
+    for( ; it!=trkID_sum.end(); ++it ) {
+      if( it->first == ide.trackID ) break; 
+    }
+
+    if (it == trkID_sum.end()) {
+      std::pair< int, std::pair<float,float> > data;
+      data.first = ide.trackID;
+      data.second.first += ide.numElectrons;
+      data.second.second += ide.energy;
+      trkID_sum.push_back(data);
+    } else {
+      it->second.first+=ide.numElectrons;
+      it->second.second+=ide.energy;
+    }
+  }
+  //sort vector of ide by num electrons
+  std::sort( trkID_sum.begin(), trkID_sum.end(), [](auto &a, auto &b){ return a.second.first > b.second.first;} );
+
+
+}
 
 
 DEFINE_ART_MODULE(wireana::WireAna)

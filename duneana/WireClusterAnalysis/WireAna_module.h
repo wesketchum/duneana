@@ -132,6 +132,11 @@ private:
   int fTickDistance;
   int fMinClusterSize;
 
+  unsigned int fMinPts;
+  float fEps;
+  float fDrift;
+  float fPitch;
+
   /////////////////////////////////////////////
   // Backtracker services
 
@@ -139,7 +144,6 @@ private:
   // config
   int fLogLevel;
   bool fDoAssns;
-  bool fIsMC;
 
   /////////////////////////////////////////////
   // Wire Filtering/Clustering Functions
@@ -157,11 +161,6 @@ private:
   // Declare output data
   TTree *fTree;
 
-  //Truth Operation
-  wireana::DataBlock_Truth truth_data;
-  void DeclareTruthBranches(TTree*t, DataBlock_Truth &blk);
-  void FillTruthBranches(art::Event const& evt, TTree*t, DataBlock_Truth &blk);
-  void ResetTruthBranches(DataBlock_Truth &blk);
 
 
 
@@ -170,6 +169,7 @@ private:
   //Module Labels and Settting
   const art::InputTag fWireProducerLabel; 
   const art::InputTag fSimChannelLabel;
+  const art::InputTag fSimulationProducerLabel;
 
 
   /////////////////////////////////////////////
@@ -178,9 +178,21 @@ private:
   int subrun;
   int event;
   int MC;
-
   int signal_Apa;
  
+  ////////////////////////////////////////////
+  // Truth Operation
+  // declare truth branch
+  wireana::DataBlock_Truth truth_data;
+
+  void DeclareTruthBranches(TTree*t, DataBlock_Truth &blk);
+  void FillTruthBranches(art::Event const& evt, TTree*t, DataBlock_Truth &blk);
+  void ResetTruthBranches(DataBlock_Truth &blk);
+
+  // Truth tagging
+  void TagROITruth( wireana::roi &roi, bool MC, detinfo::DetectorClocksData &clock );
+  std::map<raw::ChannelID_t, std::pair<art::Ptr<recob::Wire>, art::Ptr<sim::SimChannel>>> ch_w_sc;
+  art::ServiceHandle<cheat::ParticleInventoryService> PIS;
 
 
 };
