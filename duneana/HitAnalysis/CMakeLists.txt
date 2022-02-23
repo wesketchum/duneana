@@ -1,15 +1,15 @@
 art_make(BASENAME_ONLY
 	 MODULE_LIBRARIES
-	 larreco_RecoAlg
-	 lardataobj_RecoBase
-         lardataobj_RawData
-         lardata_ArtDataHelper
-	 larcore_Geometry_Geometry_service
-         larcorealg_Geometry
-	 lardataalg_DetectorInfo
+	 larreco::RecoAlg
+	 lardataobj::RecoBase
+         lardataobj::RawData
+         lardata::ArtDataHelper
+	 larcore::Geometry_Geometry_service
+         larcorealg::Geometry
+	 lardataalg::DetectorInfo
          nusimdata::SimulationBase
-	 larsim_MCCheater_BackTrackerService_service
-           larsim_MCCheater_ParticleInventoryService_service
+	 larsim::MCCheater_BackTrackerService_service
+         larsim::MCCheater_ParticleInventoryService_service
 	 dunereco::HitFinderDUNE
          ART_FRAMEWORK_CORE
 	 ART_FRAMEWORK_PRINCIPAL
@@ -23,7 +23,6 @@ art_make(BASENAME_ONLY
 	 messagefacility::MF_MessageLogger	 
 	 cetlib::cetlib cetlib_except
 	 ROOT_BASIC_LIB_LIST
-         
 )
 
 install_headers()

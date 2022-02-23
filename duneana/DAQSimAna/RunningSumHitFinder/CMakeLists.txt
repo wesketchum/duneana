@@ -2,18 +2,18 @@ make_dune_tool_builder(dunecore::RunningSumTPFinderTool)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
   dune_raw_data::dune-raw-data_Services_ChannelMap_PdspChannelMapService_service
-  larcore_Geometry_Geometry_service
-  lardataalg_DetectorInfo
-  larcorealg_Geometry
-  lardataobj_RawData
-  lardataobj_RecoBase
-  lardataobj_AnalysisBase
-  dunecore_DuneObj
-  larsim_MCCheater_BackTrackerService_service
-  larsim_MCCheater_ParticleInventoryService_service
-  larsim_MCCheater_PhotonBackTrackerService_service
-  larsim_Simulation nug4::ParticleNavigation lardataobj_Simulation
-  lardata_ArtDataHelper
+  larcore::Geometry_Geometry_service
+  lardataalg::DetectorInfo
+  larcorealg::Geometry
+  lardataobj::RawData
+  lardataobj::RecoBase
+  lardataobj::AnalysisBase
+  dunecore::DuneObj
+  larsim::MCCheater_BackTrackerService_service
+  larsim::MCCheater_ParticleInventoryService_service
+  larsim::MCCheater_PhotonBackTrackerService_service
+  larsim::Simulation nug4::ParticleNavigation lardataobj_Simulation
+  lardata::ArtDataHelper
   nusimdata::SimulationBase	
   ART_FRAMEWORK_CORE
   ART_FRAMEWORK_PRINCIPAL
@@ -25,7 +25,6 @@ art_make( BASENAME_ONLY MODULE_LIBRARIES
   art::Persistency_Provenance canvas
   art::Utilities canvas
   messagefacility::MF_MessageLogger
-  
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
   EXCLUDE read_packed.cxx RunningSumTPFinderPass1_tool.cc RunningSumTPFinderPass2_tool.cc RunningSumTPFinderPass3_tool.cc RunningSumTPFinderPass4_tool.cc

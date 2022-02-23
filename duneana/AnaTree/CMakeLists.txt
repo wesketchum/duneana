@@ -1,18 +1,21 @@
-art_make( MODULE_LIBRARIES larcorealg_Geometry
-	  larcore_Geometry_Geometry_service
-	  larsim_Simulation nug4::ParticleNavigation lardataobj_Simulation
-	  larsim_MCCheater_BackTrackerService_service
-	  larsim_MCCheater_ParticleInventoryService_service
-	  lardata_Utilities
-	  larevt_Filters
-	  lardataobj_RawData
-	  lardataobj_RecoBase
-	  lardataobj_AnalysisBase
-	  lardata_RecoObjects
-          lardata_ArtDataHelper
-          lardataalg_DetectorInfo
-	  larreco_RecoAlg
-	  larpandora_LArPandoraInterface
+art_make( MODULE_LIBRARIES 
+	  larcorealg::Geometry
+	  larcore::Geometry_Geometry_service
+	  larsim::Simulation 
+	  nug4::ParticleNavigation 
+	  lardataobj::Simulation
+	  larsim::MCCheater_BackTrackerService_service
+	  larsim::MCCheater_ParticleInventoryService_service
+	  lardata::Utilities
+	  larevt::Filters
+	  lardataobj::RawData
+	  lardataobj::RecoBase
+	  lardataobj::AnalysisBase
+	  lardata::RecoObjects
+          lardata::ArtDataHelper
+          lardataalg::DetectorInfo
+	  larreco::RecoAlg
+	  larpandora::LArPandoraInterface
 	  dunecore::SignalShapingServiceDUNE10kt_service
 	  dunecore::SignalShapingServiceDUNE35t_service
           nusimdata::SimulationBase
@@ -26,7 +29,6 @@ art_make( MODULE_LIBRARIES larcorealg_Geometry
 	  art::Persistency_Provenance canvas
 	  art::Utilities canvas
 	  messagefacility::MF_MessageLogger
-	  
 	  fhiclcpp::fhiclcpp
 	  cetlib::cetlib cetlib_except
           ROOT_GEOM

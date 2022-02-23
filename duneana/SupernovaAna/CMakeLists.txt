@@ -1,9 +1,9 @@
 art_make(BASENAME_ONLY
          MODULE_LIBRARIES
-         dunecore_DAQTriggerSim_TriggerDataProducts
-         larcore_Geometry_Geometry_service
-         larcorealg_Geometry
-         lardataobj_RawData
+         dunecore::DAQTriggerSim_TriggerDataProducts
+         larcore::Geometry_Geometry_service
+         larcorealg::Geometry
+         lardataobj::RawData
          nusimdata::SimulationBase
          ART_FRAMEWORK_CORE
          ART_FRAMEWORK_PRINCIPAL
@@ -11,15 +11,16 @@ art_make(BASENAME_ONLY
          ART_ROOT_IO_TFILE_SUPPORT
          ROOT::Core
          ART_ROOT_IO_TFILESERVICE_SERVICE
-         art::Persistency_Common canvas
-         art::Persistency_Provenance canvas
-         art::Utilities canvas
+         art::Persistency_Common
+         art::Persistency_Provenance
+         art::Utilities 
+	 canvas
          ART_PERSISTENCY_COMMON
          ART_PERSISTENCY_PROVENANCE
          ART_UTILITIES
          messagefacility::MF_MessageLogger
-         
-         cetlib::cetlib cetlib_except
+         cetlib::cetlib 
+	 cetlib_except
          ROOT_BASIC_LIB_LIST
          )
 
