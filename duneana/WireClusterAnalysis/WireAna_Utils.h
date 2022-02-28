@@ -62,17 +62,17 @@ namespace wireana{
   };
 
   struct roi{
-    roi( art::Ptr<recob::Wire> &wire, recob::Wire::RegionsOfInterest_t::datarange_t r)
+    roi( const art::Ptr<recob::Wire> &wire, recob::Wire::RegionsOfInterest_t::datarange_t r)
+      :wire(wire)
     {
       updateroi(wire, r);
     }
     roi(){};
 
-    void updateroi( art::Ptr<recob::Wire> &wire, recob::Wire::RegionsOfInterest_t::datarange_t r)
+    void updateroi( const art::Ptr<recob::Wire> &wire, recob::Wire::RegionsOfInterest_t::datarange_t r)
     {
       this->range = r;
       this->channel = wire->Channel();
-      this->wire = wire;
       this->begin_index = r.begin_index();
       this->end_index = r.end_index();
       this->width = this->end_index - this->begin_index;
@@ -82,7 +82,7 @@ namespace wireana{
       this->abs_centroid = this->Centroid(true);
     }
 
-    art::Ptr<recob::Wire> wire;
+    const art::Ptr<recob::Wire> wire;
     recob::Wire::RegionsOfInterest_t::datarange_t range;
     int channel=-1;
     int begin_index=-1;
@@ -93,6 +93,11 @@ namespace wireana{
     double abs_sum=0;
     double centroid=0;
     double abs_centroid=0;
+
+    bool hasTrueSignal = false;
+
+
+
     double Sum(bool useabs=false)
     {
       double ret=0;
@@ -113,22 +118,91 @@ namespace wireana{
       if(denum!=0) return num/denum;
       else return -999;
     }
-    std::string label;
-    std::vector< std::pair<int, double> > pdg_energy_list;
   };
 
 
 
   struct roicluster{
-    int nWires;
+    int clusID = -1;
+    int nWires = -1;
     std::string mainlabel;
-    std::vector< std::pair<int, double> > pdg_energy_list;
+    int channel_min = -1;
+    int channel_max = -1;
+    int begin_index = -1;
+    int end_index = -1;
+    int planeid = -1;
+    int view = -1;
+    bool truthFromNeutrino=false;
+    double sum = 0;
+    double abs_sum = 0;
+    double centroidChannel=0;
+    double centroidIndex=0;
+    double abs_centroidChannel=0;
+    double abs_centroidIndex=0;
+
     std::vector< roi > ROIs;
+    std::vector< std::pair< int, std::pair<float,float> > > pdg_energy_list;
+    std::vector< std::pair< int, std::pair<float,float> > > trkID_sum; 
+    std::string label;
+    TLorentzVector momentum_part;
+    TLorentzVector momentum_neutrino;
+
+
+    void AddROI( roi &roi, int planeid )
+    {
+      if(ROIs.size() == 0)
+      {
+        this->nWires=1;
+        this->clusID=roi.clusterID;
+        this->channel_min = roi.channel;
+        this->channel_max = roi.channel;
+        this->begin_index = roi.begin_index;
+        this->end_index = roi.end_index;
+        this->view = roi.wire->View();
+        this->planeid = planeid;
+      }
+      else
+      {
+        if ( this->clusID != roi.clusterID || this->view != roi.wire->View() || this->planeid != planeid ) 
+        {
+          std::cout<<"ROI did not match ROICluster!"<<std::endl;
+          return;
+        }
+        ++nWires;
+        channel_min = (roi.channel < channel_min)? roi.channel: channel_min;
+        channel_max = (roi.channel > channel_max)? roi.channel: channel_max;
+        begin_index = (roi.begin_index < begin_index)? roi.begin_index : begin_index;
+        end_index = (roi.end_index > end_index)? roi.end_index : end_index;
+      }
+      ROIs.push_back(roi);
+      // centroid = Sum( index*energy )/sum(energy)
+      this->abs_centroidChannel*= this->abs_sum;
+      this->abs_centroidChannel+= roi.channel * roi.abs_sum;
+      this->abs_centroidIndex*= this->abs_sum;
+      this->abs_centroidIndex+= roi.abs_centroid * roi.abs_sum;
+      this->abs_sum+= roi.abs_sum;
+      this->abs_centroidChannel/= this->abs_sum;
+      this->abs_centroidIndex/= this->abs_sum;
+
+      this->centroidChannel*= this->sum;
+      this->centroidChannel+= roi.channel * roi.sum;
+      this->centroidIndex*= this->sum;
+      this->centroidIndex+= roi.centroid * roi.sum;
+      this->sum+= roi.sum;
+      this->centroidChannel/= this->sum;
+      this->centroidIndex/= this->sum;
+
+      return;
+    }
+
+
+
 
   };
 
 
   typedef std::map<int, std::map< geo::View_t, std::vector<roi> > > PlaneViewROIMap;
+  typedef std::map<int, std::map< geo::View_t, std::vector<roicluster> > > PlaneViewROIClusterMap;
 
   struct ApaROIConstainer
   {

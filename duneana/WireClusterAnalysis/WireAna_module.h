@@ -50,6 +50,7 @@
 #include "TProfile.h"
 #include "TFile.h"
 #include "TROOT.h"
+#include "TLorentzVector.h"
 #include "WireAna_Utils.h"
 
 //Others
@@ -150,13 +151,16 @@ private:
   template<class T>
   void SortWirePtrByChannel( std::vector<art::Ptr<T>> &vec, bool increasing );
   std::vector<wireana::wirecluster> BuildInitialClusters( std::vector<art::Ptr<recob::Wire>> &vec, int dW, int dTick );
-  std::vector<wireana::roicluster> BuildInitialROIClusters( std::vector<art::Ptr<recob::Wire>> &vec, int dW, int dTick );
+
+
+  void BuildPlaneViewROIMap(  std::vector<art::Ptr<recob::Wire>> &wires );
+  void BuildInitialROIClusters();
   std::vector<art::Ptr<recob::Wire>> FilterWires(std::vector<art::Ptr<recob::Wire>> &vec, int dC1, int dT1, int dCn, int dTn );
   bool HasHit( const art::Ptr<recob::Wire> &wire, int minTick );
 
 
   void PrintClusters( std::vector<wirecluster> &clusters );
-  void PrintROIs( std::vector<roi> &ROIs);
+  void PrintROIs( const std::vector<roi> &ROIs);
   /////////////////////////////////////////////
   // Declare output data
   TTree *fTree;
@@ -190,9 +194,19 @@ private:
   void ResetTruthBranches(DataBlock_Truth &blk);
 
   // Truth tagging
-  void TagROITruth( wireana::roi &roi, bool MC, detinfo::DetectorClocksData &clock );
-  std::map<raw::ChannelID_t, std::pair<art::Ptr<recob::Wire>, art::Ptr<sim::SimChannel>>> ch_w_sc;
+  void FillTrackIDtoLabelMap( art::Event const& evt );
+  void TagAllROITruth( const detinfo::DetectorClocksData &clock );
+  void TagROITruth( wireana::roicluster &roi, const detinfo::DetectorClocksData &clock );
   art::ServiceHandle<cheat::ParticleInventoryService> PIS;
+
+  ////////////////////////////////////////////
+  // Internal Data Structure
+  std::map<raw::ChannelID_t, std::pair<art::Ptr<recob::Wire>, art::Ptr<sim::SimChannel>>> 
+    ch_w_sc;
+  std::map<int, std::string> 
+    trkid_to_label_map;
+  PlaneViewROIMap plane_view_roi_map; //type is std::map<int, std::map< geo::View_t, std::vector<roi> > >
+  PlaneViewROIClusterMap plane_view_roicluster_map; //type is std::map<int, std::map< geo::View_t, std::vector<roi> > >
 
 
 };
