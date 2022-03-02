@@ -123,7 +123,7 @@ namespace wireana{
 
 
   struct roicluster{
-    int clusID = -1;
+    int clusterID = -1;
     int nWires = -1;
     std::string mainlabel;
     int channel_min = -1;
@@ -146,6 +146,9 @@ namespace wireana{
     std::string label;
     TLorentzVector momentum_part;
     TLorentzVector momentum_neutrino;
+    std::vector<double> array;
+    int width_channels;
+    int width_ticks;
 
 
     void AddROI( roi &roi, int planeid )
@@ -153,7 +156,7 @@ namespace wireana{
       if(ROIs.size() == 0)
       {
         this->nWires=1;
-        this->clusID=roi.clusterID;
+        this->clusterID=roi.clusterID;
         this->channel_min = roi.channel;
         this->channel_max = roi.channel;
         this->begin_index = roi.begin_index;
@@ -163,7 +166,7 @@ namespace wireana{
       }
       else
       {
-        if ( this->clusID != roi.clusterID || this->view != roi.wire->View() || this->planeid != planeid ) 
+        if ( this->clusterID != roi.clusterID || this->view != roi.wire->View() || this->planeid != planeid ) 
         {
           std::cout<<"ROI did not match ROICluster!"<<std::endl;
           return;
@@ -195,11 +198,89 @@ namespace wireana{
       return;
     }
 
+    double TotalSignal(bool useabs=false)
+    {
+      double ret = 0;
+      for( auto &roi : this->ROIs ) ret+=roi.Sum(useabs);
+      return ret;
+    }
+    double GetNROIS(){ return this->ROIs.size(); }
+    int GetWidthTick(){ return (this->end_index - this->begin_index + 1);}
+    int GetWidthChannel(){ return (this->channel_max- this->channel_min + 1);}
 
+    std::vector< art::Ptr<recob::Wire> > GetWires()
+    {
+      std::vector< art::Ptr<recob::Wire> > ret;
+      for( auto &roi: this->ROIs ) 
+      {
+        if( std::find( ret.begin(), ret.end(), roi.wire ) == ret.end() )
+        {
+          ret.push_back( roi.wire );
+        }
+      }
+      return ret;
+    }
 
+    void CalculateArray( double channel_width, double tick_width )
+    {
+      this->width_channels = channel_width;
+      this->width_ticks = tick_width;
+      std::vector<double> ret( channel_width*tick_width, 0 );
 
+      int c0,t0;//c1,t0,t1;
+      c0=this->abs_centroidChannel - channel_width/2.;
+      t0=this->abs_centroidIndex - tick_width/2.;
+
+      for( auto& roi : this->ROIs )
+      {
+        int c = roi.channel - c0;
+        for ( int index = roi.begin_index; index<=roi.end_index; ++index )
+        {
+          int t = index - t0;
+          int arr_index = c + t*channel_width;
+          ret[arr_index] = roi.wire->SignalROI()[index];
+        }
+      }
+      this->array = ret;
+    }
+    
+    unsigned int GetIndex(unsigned int c, unsigned int t)
+    {
+      return c%this->width_channels + t*this->width_channels;
+    }
+
+    std::pair<unsigned int, unsigned int> GetCT( unsigned index )
+    {
+      unsigned int c = index%this->width_channels;
+      unsigned int t = index/this->width_channels;
+      return std::make_pair(c,t);
+    }
+
+    double GetArray(unsigned int c, unsigned int t)
+    {
+      unsigned int index = GetIndex(c,t);
+      if (this->array.size() == 0 || index >= (this->array.size()) ) return -1;
+      return this->array[index];
+
+    }
   };
 
+  struct matchedroicluster{
+    matchedroicluster( int planeid, double metric, roicluster &u, roicluster &v, roicluster &z )
+    {
+      this->planeid = planeid;
+      this->metric = metric;
+      clusters.push_back(u);
+      clusters.push_back(v);
+      clusters.push_back(z);
+      totalROIs = u.ROIs.size() + v.ROIs.size() + z.ROIs.size();
+    }
+    int planeid;
+    double metric;
+    int totalROIs;
+    //u=0, v=1, z=2
+    std::vector<roicluster> clusters;
+  };
 
   typedef std::map<int, std::map< geo::View_t, std::vector<roi> > > PlaneViewROIMap;
   typedef std::map<int, std::map< geo::View_t, std::vector<roicluster> > > PlaneViewROIClusterMap;
@@ -212,6 +293,8 @@ namespace wireana{
 
 
   class WireAnaDBSCAN;
+  class ROIMatcher;
+  class numpywriter;
 }
 
 
@@ -363,5 +446,133 @@ wireana::WireAnaDBSCAN::calculateDistance( const roi &r1, const roi &r2, float d
 }
 
 
+class wireana::ROIMatcher
+{
+  public:
+  ROIMatcher(){
+    fGeometry = &*(art::ServiceHandle<geo::Geometry const>());
+  }
+  ~ROIMatcher(){}
 
+  void Reset();
+  void SetData( PlaneViewROIClusterMap pvrm ) { m_planeViewRoillusterMap = pvrm; }
+  void MatchROICluster();
+  const std::vector<matchedroicluster> &GetMatchedClusters() { return m_matchedclusters; }
+
+  private:
+  bool OverlapInTime(const roicluster& r1, const roicluster& r2, double frac=.8);
+  bool OverlapInSpace(const roicluster& r1, const roicluster& r2);
+
+  double DeltaT(const roicluster& r1, const roicluster& r2);
+  double DeltaC(const roicluster& r1, const roicluster& r2);
+  double DeltaCT( const wireana::roicluster& r1, const wireana::roicluster &r2 );
+
+  geo::GeometryCore const* fGeometry;
+
+  PlaneViewROIClusterMap m_planeViewRoillusterMap;
+  std::vector<matchedroicluster> m_matchedclusters; 
+};
+
+void 
+wireana::ROIMatcher::Reset()
+{
+  m_planeViewRoillusterMap.clear();
+  m_matchedclusters.clear();
+}
+
+bool 
+wireana::ROIMatcher::OverlapInTime(const roicluster& r1, const roicluster& r2, double frac)
+{
+  roicluster rr1 = (r1.begin_index < r2.begin_index)? r1 : r2;
+  roicluster rr2 = (r1.begin_index < r2.begin_index)? r2 : r1;
+  bool overlap = (rr2.begin_index - rr1.end_index)<=0;
+  //must overlap and similar sized
+  int dt1 = rr1.end_index - rr1.begin_index;
+  int dt2 = rr2.end_index - rr2.begin_index;
+  bool similar = false;
+  if (dt1 > dt2) similar = ((dt1-dt2)/dt1 > frac);
+  else similar = ((dt2-dt1)/dt2 > frac);
+  return (overlap && similar);
+}
+
+double
+wireana::ROIMatcher::DeltaT(const wireana::roicluster& r1, const wireana::roicluster& r2)
+{
+  return abs( r1.begin_index - r2.begin_index ) + abs( r1.end_index - r2.end_index );
+}
+
+double
+wireana::ROIMatcher::DeltaC(const roicluster& r1, const roicluster& r2)
+{
+  double ret = 0;
+  std::map<raw::ChannelID_t, std::vector<geo::WireID>> cwidmap;
+  for( auto &rr1 : r1.ROIs ){
+    raw::ChannelID_t c1 = rr1.wire->Channel();
+    auto c1towid = fGeometry->ChannelToWire(c1);
+    for( auto &rr2: r2.ROIs )
+    {
+      //double y,z;
+      raw::ChannelID_t c2 = rr2.wire->Channel();
+      if( cwidmap.find(c2) == cwidmap.end() ) cwidmap[c2] = fGeometry->ChannelToWire(c2);
+      //loop through each wid, set intersect to true if any has intersection
+
+      bool intersect = false;
+      for( auto &w1: c1towid )
+      {
+        for( auto &w2: cwidmap[c2] )
+        {
+          geo::Point_t intersection_point;
+          if( w1.asTPCID() != w2 ) continue;
+          intersect = fGeometry->WireIDsIntersect(w1,w2,intersection_point);
+          if( intersect ) break;
+        }
+      }
+      ret+= (!intersect);
+    };
+  }
+  return ret;
+}
+
+double 
+wireana::ROIMatcher::DeltaCT( const wireana::roicluster& r1, const wireana::roicluster &r2 )
+{
+  double dT = DeltaT(r1,r2);
+  return dT;
+  //double dC = DeltaC(r1,r2);
+  //return pow(dT*dT+dC*dC,0.5);
+}
+
+void 
+wireana::ROIMatcher::MatchROICluster()
+{
+  m_matchedclusters.clear();
+
+  for( auto& pvv: m_planeViewRoillusterMap )//plane: (view, vector<roicluster>)
+  {
+    int planeid = pvv.first;
+    //u=0, v=1, z=2
+    for( auto & rcu: pvv.second[geo::kU] )
+    {
+      if( rcu.clusterID < 0 ) continue;
+      int n_rcu = rcu.ROIs.size();
+      for( auto & rcv: pvv.second[geo::kV] )
+      {
+        if( rcv.clusterID < 0 ) continue;
+        int n_rcv = rcv.ROIs.size();
+        double uv = DeltaCT(rcu,rcv);
+        for( auto & rcz: pvv.second[geo::kZ] )
+        {
+          if( rcz.clusterID < 0 ) continue;
+          int n_rcz = rcz.ROIs.size();
+          double uz = DeltaCT(rcu,rcz);
+          double vz = DeltaCT(rcv,rcz);
+          double metric = pow( uv*uv+uz*uz+vz*vz, 0.5 )/(n_rcu+n_rcv+n_rcz);
+          m_matchedclusters.push_back( matchedroicluster(planeid, metric, rcu, rcv, rcz ));
+        }//loop z
+      }//loop v
+    }//loop u 
+    std::sort(m_matchedclusters.begin(), m_matchedclusters.end(),
+      [](const auto &a, const auto &b){ return a.metric < b.metric; });
+  }
+}
 #endif

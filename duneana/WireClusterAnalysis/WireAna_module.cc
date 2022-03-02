@@ -87,10 +87,77 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   // Build ROICluster
   BuildPlaneViewROIMap( wirelist );
   BuildInitialROIClusters();
-  if ( MC )
+  if ( MC ) TagAllROITruth( clockData );
+
+  //Match ROI across views
+  ROIMatcher matcher;
+  matcher.SetData(plane_view_roicluster_map);
+  matcher.MatchROICluster();
+  bool hasCluster = (matcher.GetMatchedClusters().size() != 0 );
+  if( hasCluster )
   {
-    TagAllROITruth( clockData );
+    //Logs
+    if( fLogLevel >= 3 )
+    {
+      std::cout<<"  List Matched Clusters: "<<std::endl;
+      int i = 0;
+      for( auto mc : matcher.GetMatchedClusters() )
+      {
+        if (i>3) break;
+        std::cout<<"    Item "<<i<<", PlaneID: "<<mc.planeid<<std::endl
+                 <<"        metric: "<<mc.metric<<std::endl;
+        for( int v=0;v<3;v++ )
+        {
+         std::cout<<Form("        View: %d, tick(%d, %d, %d), ch(%d, %d, %d)",
+                      mc.clusters[v].view,
+                      mc.clusters[v].begin_index,
+                      mc.clusters[v].end_index,
+                      mc.clusters[v].end_index-mc.clusters[v].begin_index,
+                      mc.clusters[v].channel_min,
+                      mc.clusters[v].channel_max, 
+                      mc.clusters[v].channel_max-mc.clusters[v].channel_min
+                      )<<std::endl;
+        }
+        ++i;
+      }
+    }//end Logs
+
+    matchedroicluster mCluster = matcher.GetMatchedClusters().front();
+    int ch_width=13,tick_width= 400, nticks=4;
+    std::vector<double> u_vec = GetArrayFromWire( wirelist, mCluster.clusters[0], ch_width,tick_width);
+    std::vector<double> v_vec = GetArrayFromWire( wirelist, mCluster.clusters[1], ch_width,tick_width);
+    std::vector<double> z_vec = GetArrayFromWire( wirelist, mCluster.clusters[2], ch_width,tick_width);
+
+    std::vector<double> u_vecc = CombineTicks( u_vec, ch_width, nticks );
+    std::vector<double> v_vecc = CombineTicks( v_vec, ch_width, nticks );
+    std::vector<double> z_vecc = CombineTicks( z_vec, ch_width, nticks );
+    std::vector<double> u_veccs = ScaleArray( u_vecc, 1, 225 );
+    std::vector<double> v_veccs = ScaleArray( v_vecc, 1, 225 );
+    std::vector<double> z_veccs = ScaleArray( z_vecc, 1, 225 );
+
+    //Logs
+    if( fLogLevel >= 3 )
+    {
+      std::cout<<"  Print Array Values: "<<std::endl;
+      //int t=0;
+      for( unsigned int i = 0; i<z_vecc.size(); i++ )
+      {
+        //if( i % ch_width == 0 ) std::cout<<std::endl<<"line "<<t++<<": ";
+        if( i % ch_width == 0 ) std::cout<<std::endl<<"[ ";
+        std::cout<<Form("(%d,%d,%d), ",(int)u_veccs[i],(int)v_veccs[i],(int)z_veccs[i]);
+        if( i % ch_width == (unsigned int) (ch_width-1) ) std::cout<<"],";
+        //if (u_vec[i]==0) continue;
+        //auto ct = CalculateCT(i,ch_width,tick_width);
+        //std::cout<<Form("    Pts: (%d, %d, %.2f)", ct.first,ct.second,u_vec[i])<<std::endl;
+      }
+      std::cout<<std::endl<<"  == End Print Array Values: "<<std::endl<<
+                             Form("  are wires the same? uv, uz, vz: %d,%d,%d",
+                                 (u_vec==v_vec),
+                                 (u_vec==z_vec),
+                                 (v_vec==z_vec) )<<std::endl;
+    }//end Logs
   }
+
 
   /////////////////////////////////////////////////////////////
   // Build ROICluster
@@ -209,7 +276,7 @@ void wireana::WireAna::FillTruthBranches(art::Event const& evt, TTree*t, DataBlo
 template<class T>
 void wireana::WireAna::SortWirePtrByChannel( std::vector<art::Ptr<T>> &vec, bool increasing )
 {
-  if( fLogLevel >= 3 ) 
+  if( fLogLevel >= 10 ) 
   {
     std::cout<<"Entering SortWirePtrByChannel, sorting "<<vec.size()<<"channels."<<std::endl;
   }
@@ -341,7 +408,7 @@ void wireana::WireAna::BuildInitialROIClusters()
   //  }
   //}
 
-  if( fLogLevel >= 3 )
+  if( fLogLevel >= 10 )
   {
     for( const auto &p: plane_view_roicluster_map)
     {
@@ -435,9 +502,10 @@ wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
         std::cout<<Form("Plane %d, View %d: ", pvv.first,vv.first)<<std::endl;
         for (auto & cluster : vv.second )
         {
+          std::cout<<"-----------------"<<std::endl;
           std::cout<<
             Form("  Cluster ID: %d, (wMin, wMax):(%d, %d), (tMin, tMax):(%d, %d)",
-              cluster.clusID,
+              cluster.clusterID,
               cluster.channel_min, cluster.channel_max, 
               cluster.begin_index, cluster.end_index )
             <<std::endl;
@@ -446,6 +514,25 @@ wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
                cluster.label.c_str(), cluster.pdg_energy_list.front().first,
                 cluster.pdg_energy_list.front().second.first)
             <<std::endl;
+          std::cout<<
+            Form("   centroid (Channel,Ticks): (%f, %f). width(c,t):(%i,%i)", 
+               cluster.abs_centroidChannel, cluster.abs_centroidIndex,
+               cluster.GetWidthChannel(),  cluster.GetWidthTick() )
+            <<std::endl;
+          if( cluster.truthFromNeutrino )
+          {
+          std::cout<<
+            Form("   Has Neutrino Truth: Pnu(%f,%f,%f,%f), Ppart(%f,%f,%f,%f)",
+                cluster.momentum_neutrino.Px(),
+                cluster.momentum_neutrino.Py(),
+                cluster.momentum_neutrino.Pz(),
+                cluster.momentum_neutrino.E(),
+                cluster.momentum_part.Px(),
+                cluster.momentum_part.Py(),
+                cluster.momentum_part.Pz(),
+                cluster.momentum_part.E())
+            <<std::endl;
+          }
         }
       }
     }
@@ -459,10 +546,10 @@ wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
 void
 wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::DetectorClocksData &clock )
 {
-  if (fLogLevel>=3) std::cout<<"Entering TagROITruth"<<std::endl;
+  if (fLogLevel>=10) std::cout<<"Entering TagROITruth"<<std::endl;
 
   std::vector< std::pair< int, std::pair<float,float> > > trkID_sum; 
-  for ( auto roi: cluster.ROIs ) // loop 1
+  for ( auto& roi: cluster.ROIs ) // loop 1
   {
     int roi_channel = roi.wire->Channel();
     if (fLogLevel>=10) 
@@ -550,5 +637,126 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
 
 }
 
+std::vector<double>
+wireana::WireAna::GetArrayFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist, wireana::roicluster &cluster, int channel_width, int tick_width )
+{
+  
+  double centroid_channel = cluster.abs_centroidChannel, centroid_tick = cluster.abs_centroidIndex;
+  unsigned int c0,t0;
+  c0= centroid_channel - channel_width/2. + 1;
+  t0= centroid_tick - tick_width/2.;
+  std::vector<double> ret( channel_width*tick_width, 0 );
+  auto ptr1 = wirelist.begin();
+  while ( (*ptr1)->Channel() < c0 ) ++ptr1; //increment ptr1 until it reaches the first channel within range
+  auto ptr_end = ptr1;
+  while ( (*ptr_end)->Channel() < c0+channel_width ) ++ptr_end; 
+  //increment ptr_end until it reaches the first channel outside the range. 
+  //i.e. cfirst, clast = 1,5 --> width = 5
+  //1+5 = 6 is the first channel outside the range
+  //so ptr_end will end when channel >= 6 
+  //
+  if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("GetArrayFromWire::Log:  c(c,t):(%.2f, %.2f). (c0,t0):(%d,%d). cpos(%d,%d) ",centroid_channel, centroid_tick, c0, t0, int(centroid_channel-c0), int(centroid_tick-t0))<<std::endl;
+    std::cout<<Form("                        (ch_begin,ch_end): (%d, %d)",(*ptr1)->Channel(),(*(ptr_end-1))->Channel() )<<std::endl;
+  }
+
+
+
+  for ( auto ptr = ptr1; ptr != ptr_end; ++ptr )
+  {
+    int channel = (*ptr)->Channel();
+    int dC = channel - c0;
+    if( dC>=channel_width) break;
+    for( int i = 0; i < tick_width; ++i )
+    {
+      int index = dC + i*channel_width ;
+      ret[index] = (*ptr)->SignalROI()[t0+i];
+    }
+  }
+  
+  return ret;
+  
+}
+
+std::vector<double> 
+wireana::WireAna::CombineTicks( const std::vector<double> &input, int channel_width, int nticks)
+{
+  std::vector<double> output;
+  std::string func_name = "CombineTicks: ";
+  int n_totalticks = input.size()/channel_width;
+
+  if( n_totalticks%nticks != 0 ) 
+  {
+    std::cout<<"Err: CombineTicks: nticks does not divide total number of ticks"<<std::endl;
+    return output;
+  }
+
+  std::vector<unsigned int> index_list;
+  for( int i = 0; i< n_totalticks/nticks; i++ )
+  {
+    unsigned int start_index = (i*nticks)*channel_width; //start index at each chunk
+    unsigned int end_index = start_index+channel_width;  //end index of first line in each chunk
+    if(fLogLevel>=10) std::cout<<func_name<<"start_index: "<<start_index<<" end_index: "<<end_index<<std::endl
+                               <<func_name<<"summing: ";
+    for( unsigned int index = start_index; index<end_index; ++index )
+    {
+      //for each pass, loop through channels once. At each channel sum up nticks together
+      double v=0;
+      for( int t = 0; t < nticks; ++t ) 
+      {
+        unsigned int sum_index=index+ t*channel_width;
+        v+= input[sum_index];
+        if(fLogLevel>=10) std::cout<<func_name<<"("<<sum_index<<", "<<input[sum_index]<<") ";
+      }
+      output.push_back( v );
+      if( fLogLevel >= 10 ) std::cout<<func_name<<std::endl;;
+    }
+    if( fLogLevel >= 10 ) std::cout<<func_name<<std::endl;
+
+  }
+  return output;
+}
+
+
+std::vector<double> 
+wireana::WireAna::ScaleArray( const std::vector<double> &input, double min, double max )
+{
+  std::vector<double> output;
+  if( max-min <= 0 ) return output;
+  double delta = max - min;
+  double this_min = *std::min_element(input.begin(), input.end());
+  double this_max = *std::max_element(input.begin(), input.end());
+  double this_delta = this_max-this_min;
+  for( auto v: input )
+  {
+    //linearly transform element to new values
+    // map to (0,1): v1 = (v-this_min)/this_delta
+    // map to (min, max) vnew = v1*delta + min 
+    if(v == 0 )
+    {
+      //do not transform 0, 
+      //TODO: initialize array with default value, i.e. -999
+      output.push_back(0);
+      continue;
+    }
+    double vnew = (v-this_min)/this_delta * delta + min;
+    output.push_back(vnew);
+  }
+  return output;
+}
+
+int 
+wireana::WireAna::CalculateIndex( int c, int t, int c_width, int t_width )
+{
+  return (c%c_width) + (t%t_width)*c_width;
+}
+std::pair<int,int> 
+wireana::WireAna::CalculateCT( int index, int c_width )
+{
+  int c = index%c_width;
+  int t = index/c_width;
+  return std::make_pair( c, t);
+}
 
 DEFINE_ART_MODULE(wireana::WireAna)

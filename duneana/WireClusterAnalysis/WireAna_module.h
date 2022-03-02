@@ -161,6 +161,10 @@ private:
 
   void PrintClusters( std::vector<wirecluster> &clusters );
   void PrintROIs( const std::vector<roi> &ROIs);
+
+  /////////////////////////////////////////////
+  // Cluster Matching
+
   /////////////////////////////////////////////
   // Declare output data
   TTree *fTree;
@@ -208,6 +212,13 @@ private:
   PlaneViewROIMap plane_view_roi_map; //type is std::map<int, std::map< geo::View_t, std::vector<roi> > >
   PlaneViewROIClusterMap plane_view_roicluster_map; //type is std::map<int, std::map< geo::View_t, std::vector<roi> > >
 
+  ////////////////////////////////////////////
+  // Image Forming:
+  std::vector<double> GetArrayFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist, wireana::roicluster &cluster, int channel_width, int new_tickwidth );
+  std::vector<double> CombineTicks( const std::vector<double> &input, int channel_width, int nticks);
+  std::vector<double> ScaleArray( const std::vector<double> &input, double min, double max );
+  int CalculateIndex( int c, int t, int c_width, int t_width );
+  std::pair<int,int> CalculateCT( int index, int c_width );
 
 };
 

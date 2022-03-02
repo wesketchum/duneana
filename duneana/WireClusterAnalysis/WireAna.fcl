@@ -7,7 +7,7 @@ standard_wireana:
   InputWireProducerLabel:       "caldata"
   SimChannelLabel:              "elecDrift"
   SimulationProducerLabel:      "largeant"
-  LogLevel:                     10
+  LogLevel:                     3
   DoAssns:                      false
   ChannelPerApa:                2560
   TickesPerWire:                6000
