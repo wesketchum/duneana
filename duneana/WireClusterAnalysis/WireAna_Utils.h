@@ -34,10 +34,15 @@ namespace wireana{
   using recob::Hit;
 
   enum PType{ kUnknown=0, kMarl, kAPA, kCPA, kAr39, kAr42, kNeutron, kKryp, kPlon, kRdon, kNPTypes };
+
   enum EType{
     kES,
     kCC,
     kRad
+  };
+
+  enum GType{
+    kNone,kElastic,kMarley,kOthers,kMismatch
   };
 
   
@@ -58,7 +63,6 @@ namespace wireana{
     {
       return this->wire_pointers.back();
     }
-    
   };
 
   struct roi{
@@ -67,7 +71,24 @@ namespace wireana{
     {
       updateroi(wire, r);
     }
+    //roi( const roi &r )
+    //{
+    //  roi( r.wire, r.range );
+    //}
     roi(){};
+
+    const art::Ptr<recob::Wire> wire;
+    recob::Wire::RegionsOfInterest_t::datarange_t range;
+    int channel=-1;
+    int begin_index=-1;
+    int end_index=-1;
+    int width=-1;
+    int clusterID=-1;
+    double sum=0;
+    double abs_sum=0;
+    double centroid=0;
+    double abs_centroid=0;
+    bool hasTrueSignal = false;
 
     void updateroi( const art::Ptr<recob::Wire> &wire, recob::Wire::RegionsOfInterest_t::datarange_t r)
     {
@@ -81,22 +102,6 @@ namespace wireana{
       this->centroid = this->Centroid();
       this->abs_centroid = this->Centroid(true);
     }
-
-    const art::Ptr<recob::Wire> wire;
-    recob::Wire::RegionsOfInterest_t::datarange_t range;
-    int channel=-1;
-    int begin_index=-1;
-    int end_index=-1;
-    int width=-1;
-    int clusterID=-1;
-    double sum=0;
-    double abs_sum=0;
-    double centroid=0;
-    double abs_centroid=0;
-
-    bool hasTrueSignal = false;
-
-
 
     double Sum(bool useabs=false)
     {
@@ -118,14 +123,19 @@ namespace wireana{
       if(denum!=0) return num/denum;
       else return -999;
     }
+
+    friend bool operator == ( const roi &lhs, const roi &rhs );
   };
+  bool operator == ( const roi &lhs, const roi &rhs )
+  {
+    return ( lhs.wire == rhs.wire &&  lhs.range == rhs.range && lhs.hasTrueSignal == rhs.hasTrueSignal );
+  }
 
 
 
   struct roicluster{
     int clusterID = -1;
     int nWires = -1;
-    std::string mainlabel;
     int channel_min = -1;
     int channel_max = -1;
     int begin_index = -1;
@@ -139,6 +149,16 @@ namespace wireana{
     double centroidIndex=0;
     double abs_centroidChannel=0;
     double abs_centroidIndex=0;
+
+    int label_code = -1 ;
+
+    int n_nu = 0;
+    int n_lepton = 0;
+    int n_proton = 0;
+    int n_neutron = 0;
+    int n_photon = 0;
+    int n_nucleus = 0;
+    int n_meson = 0;
 
     std::vector< roi > ROIs;
     std::vector< std::pair< int, std::pair<float,float> > > pdg_energy_list;
@@ -261,9 +281,38 @@ namespace wireana{
       unsigned int index = GetIndex(c,t);
       if (this->array.size() == 0 || index >= (this->array.size()) ) return -1;
       return this->array[index];
-
     }
+
+    friend bool operator==(const roicluster&l, const roicluster& r );
   };
+  bool operator==(const roicluster& l ,const roicluster& r )
+  {
+    return (
+        l.clusterID == r.clusterID &&
+        l.nWires == r.nWires &&
+        l.channel_min        ==      r.channel_min           &&
+        l.channel_max        ==      r.channel_max           &&
+        l.begin_index        ==      r.begin_index           &&
+        l.end_index          ==      r.end_index             &&
+        l.planeid            ==      r.planeid               &&
+        l.view               ==      r.view                  &&
+        l.truthFromNeutrino  ==      r.truthFromNeutrino     &&
+        l.sum                ==      r.sum                   &&
+        l.abs_sum            ==      r.abs_sum               &&
+        l.centroidChannel    ==      r.centroidChannel       &&
+        l.centroidIndex      ==      r.centroidIndex         &&
+        l.abs_centroidChannel==      r.abs_centroidChannel   &&
+        l.abs_centroidIndex  ==      r.abs_centroidIndex     &&
+        l.label_code         ==      r.label_code            &&
+        l.n_nu               ==      r.n_nu                  &&
+        l.n_lepton           ==      r.n_lepton              &&
+        l.n_proton           ==      r.n_proton              &&
+        l.n_neutron          ==      r.n_neutron             &&
+        l.n_photon           ==      r.n_photon              &&
+        l.n_nucleus          ==      r.n_nucleus             &&
+        l.n_meson            ==      r.n_meson          &&
+        l.ROIs               ==      r.ROIs      );
+  }
 
   struct matchedroicluster{
     matchedroicluster( int planeid, double metric, roicluster &u, roicluster &v, roicluster &z )
@@ -280,6 +329,47 @@ namespace wireana{
     int totalROIs;
     //u=0, v=1, z=2
     std::vector<roicluster> clusters;
+
+    unsigned int gencode()
+    {
+      std::set<unsigned int> labelset;
+      for( auto &cluster:clusters )
+      {
+        labelset.insert( cluster.label_code );
+      }
+      if ( labelset.size() == 1 ) return clusters.front().label_code;
+      return kMismatch;
+    }
+
+    bool labelmatch()
+    {
+      bool matched = false;
+      if(clusters.size()==3)
+      {
+        std::string l0 = clusters[0].label;
+        std::string l1 = clusters[1].label;
+        std::string l2 = clusters[2].label;
+        matched=((l0==l1)&&(l1==l2));
+      }
+      return matched;
+    }
+    bool trkmatch()
+    {
+      bool matched = false;
+      if(clusters.size()==3)
+      {
+        for( auto &cluster : clusters )
+        {
+          if ( cluster.trkID_sum.size() == 0 ) return false;
+        }
+        int l0 = clusters[0].trkID_sum.front().first;
+        int l1 = clusters[1].trkID_sum.front().first;
+        int l2 = clusters[2].trkID_sum.front().first;
+        matched=((l0==l1)&&(l1==l2));
+      }
+      return matched;
+    }
+
   };
 
   typedef std::map<int, std::map< geo::View_t, std::vector<roi> > > PlaneViewROIMap;
@@ -457,6 +547,7 @@ class wireana::ROIMatcher
   void Reset();
   void SetData( PlaneViewROIClusterMap pvrm ) { m_planeViewRoillusterMap = pvrm; }
   void MatchROICluster();
+  void CleanDuplicates( float delta = 0. );
   const std::vector<matchedroicluster> &GetMatchedClusters() { return m_matchedclusters; }
 
   private:
@@ -465,6 +556,7 @@ class wireana::ROIMatcher
 
   double DeltaT(const roicluster& r1, const roicluster& r2);
   double DeltaC(const roicluster& r1, const roicluster& r2);
+  double DeltaN(const roicluster& r1, const roicluster& r2);
   double DeltaCT( const wireana::roicluster& r1, const wireana::roicluster &r2 );
 
   geo::GeometryCore const* fGeometry;
@@ -502,6 +594,12 @@ wireana::ROIMatcher::DeltaT(const wireana::roicluster& r1, const wireana::roiclu
 }
 
 double
+wireana::ROIMatcher::DeltaN(const wireana::roicluster& r1, const wireana::roicluster& r2)
+{
+  return abs( r1.nWires - r2.nWires );
+}
+
+double
 wireana::ROIMatcher::DeltaC(const roicluster& r1, const roicluster& r2)
 {
   double ret = 0;
@@ -536,10 +634,11 @@ wireana::ROIMatcher::DeltaC(const roicluster& r1, const roicluster& r2)
 double 
 wireana::ROIMatcher::DeltaCT( const wireana::roicluster& r1, const wireana::roicluster &r2 )
 {
-  double dT = DeltaT(r1,r2);
-  return dT;
-  //double dC = DeltaC(r1,r2);
-  //return pow(dT*dT+dC*dC,0.5);
+  double dT=0,dN=0,dC=0;
+  dT = DeltaT(r1,r2);
+  dN = DeltaN(r1,r2);
+  //dC = DeltaC(r1,r2);
+  return dT+dN+dC;
 }
 
 void 
@@ -566,7 +665,7 @@ wireana::ROIMatcher::MatchROICluster()
           int n_rcz = rcz.ROIs.size();
           double uz = DeltaCT(rcu,rcz);
           double vz = DeltaCT(rcv,rcz);
-          double metric = pow( uv*uv+uz*uz+vz*vz, 0.5 )/(n_rcu+n_rcv+n_rcz);
+          double metric = pow( uv*uv+uz*uz+vz*vz, 0.5 )/pow(n_rcu+n_rcv+n_rcz,3);
           m_matchedclusters.push_back( matchedroicluster(planeid, metric, rcu, rcv, rcz ));
         }//loop z
       }//loop v
@@ -575,4 +674,40 @@ wireana::ROIMatcher::MatchROICluster()
       [](const auto &a, const auto &b){ return a.metric < b.metric; });
   }
 }
+void 
+wireana::ROIMatcher::CleanDuplicates(float delta)
+{
+  if ( m_matchedclusters.size() == 0 ) return;
+  std::cout<<"Initial Matched Clusters Size: "<<m_matchedclusters.size()<<std::endl;
+  auto it = m_matchedclusters.begin(); 
+  while ( it != m_matchedclusters.end() )
+  {
+    //it->clusters;
+    auto it2 = it+1;
+    while ( it2 != m_matchedclusters.end() )
+    {
+      //loop over rest of the clusters and remove any that contains duplicate clusters. 
+      bool found_duplicate_cluster = false;
+      if( std::abs(it->metric - it2->metric) > delta )
+      {
+        for( auto clus = it2->clusters.begin(); clus != it2->clusters.end(); ++clus )
+        {
+          if ( std::find( it->clusters.begin(), it->clusters.end(), *clus ) != it->clusters.end() )
+          {
+            //found roicluster
+            found_duplicate_cluster = true;
+            break;
+          }
+        }
+      }
+      if ( found_duplicate_cluster ) 
+        m_matchedclusters.erase( it2 ); 
+      // since current it2 erased, it2 automatically becomes the "next" element
+      else ++it2;
+    }
+    ++it;
+  }
+  std::cout<<"Final Matched Clusters Size: "<<m_matchedclusters.size()<<std::endl;
+}
+
 #endif

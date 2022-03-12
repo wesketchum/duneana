@@ -20,6 +20,19 @@ wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
   fDrift   =  pset.get<float>("DBSCAN_Drift", 1.6);
   fPitch   =  pset.get<float>("DBSCAN_Pitch", 3.0);
 
+  fDeltaMetric = pset.get<float>("CleanClusterDeltaScore", 0.01);
+
+  image_channel_width  = pset.get<int>("IMAGE_CHANNEL_WIDTH",13); 
+  image_tick_width     = pset.get<int>("IMAGE_TICK_WIDTH",400); 
+  image_rebin_tick     = pset.get<int>("IMAGE_REBIN_TICK",4); 
+  image_size           = image_channel_width*image_tick_width/image_rebin_tick;
+
+  fDumpFileName      = pset.get<std::string>("DUMPFILENAME", "out.npy");
+  fDumpMaxRow        = pset.get<int>("DUMPMAXROW", 50000);
+
+  fViewMap[0]   =   "U";
+  fViewMap[1]   =   "V";
+  fViewMap[2]   =   "Z";
 }
 
 void wireana::WireAna::analyze(art::Event const & evt) {
@@ -85,14 +98,25 @@ void wireana::WireAna::analyze(art::Event const & evt) {
 
   /////////////////////////////////////////////////////////////
   // Build ROICluster
+  //
+  if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): Start"<<std::endl;
   BuildPlaneViewROIMap( wirelist );
+  if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): End"<<std::endl;
+  if( fLogLevel>=10 ) std::cout<<"BuildInitialROIClusters(): Start"<<std::endl;
   BuildInitialROIClusters();
-  if ( MC ) TagAllROITruth( clockData );
+  if( fLogLevel>=10 ) std::cout<<"BuildInitialROIClusters(): Done"<<std::endl;
+  if ( MC ) 
+  {
+    TagAllROITruth( clockData );
+    if( fLogLevel>=10 ) std::cout<<"TagAllROITruth(): Done"<<std::endl;
+  }
 
   //Match ROI across views
   ROIMatcher matcher;
   matcher.SetData(plane_view_roicluster_map);
   matcher.MatchROICluster();
+  if( fLogLevel>=10 ) std::cout<<"matcher.MatchROICluster(): Done"<<std::endl;
+  matcher.CleanDuplicates(fDeltaMetric);
   bool hasCluster = (matcher.GetMatchedClusters().size() != 0 );
   if( hasCluster )
   {
@@ -103,7 +127,7 @@ void wireana::WireAna::analyze(art::Event const & evt) {
       int i = 0;
       for( auto mc : matcher.GetMatchedClusters() )
       {
-        if (i>3) break;
+        if (i>10) break;
         std::cout<<"    Item "<<i<<", PlaneID: "<<mc.planeid<<std::endl
                  <<"        metric: "<<mc.metric<<std::endl;
         for( int v=0;v<3;v++ )
@@ -122,40 +146,48 @@ void wireana::WireAna::analyze(art::Event const & evt) {
       }
     }//end Logs
 
-    matchedroicluster mCluster = matcher.GetMatchedClusters().front();
-    int ch_width=13,tick_width= 400, nticks=4;
-    std::vector<double> u_vec = GetArrayFromWire( wirelist, mCluster.clusters[0], ch_width,tick_width);
-    std::vector<double> v_vec = GetArrayFromWire( wirelist, mCluster.clusters[1], ch_width,tick_width);
-    std::vector<double> z_vec = GetArrayFromWire( wirelist, mCluster.clusters[2], ch_width,tick_width);
-
-    std::vector<double> u_vecc = CombineTicks( u_vec, ch_width, nticks );
-    std::vector<double> v_vecc = CombineTicks( v_vec, ch_width, nticks );
-    std::vector<double> z_vecc = CombineTicks( z_vec, ch_width, nticks );
-    std::vector<double> u_veccs = ScaleArray( u_vecc, 1, 225 );
-    std::vector<double> v_veccs = ScaleArray( v_vecc, 1, 225 );
-    std::vector<double> z_veccs = ScaleArray( z_vecc, 1, 225 );
-
-    //Logs
-    if( fLogLevel >= 3 )
+    for( auto  mCluster : matcher.GetMatchedClusters() )
     {
-      std::cout<<"  Print Array Values: "<<std::endl;
-      //int t=0;
-      for( unsigned int i = 0; i<z_vecc.size(); i++ )
+      //matchedroicluster mCluster = matcher.GetMatchedClusters().front();
+      int ch_width=image_channel_width,tick_width= image_tick_width, nticks=image_rebin_tick;
+      std::vector<double> u_vec = GetArrayFromWire( wirelist, mCluster.clusters[0], ch_width,tick_width);
+      std::vector<double> v_vec = GetArrayFromWire( wirelist, mCluster.clusters[1], ch_width,tick_width);
+      std::vector<double> z_vec = GetArrayFromWire( wirelist, mCluster.clusters[2], ch_width,tick_width);
+
+      if( fLogLevel >= 3 ) std::cout<<"  Got all ArrayFromWire: "<<std::endl;
+      std::vector<double> u_vecc = CombineTicks( u_vec, ch_width, nticks );
+      std::vector<double> v_vecc = CombineTicks( v_vec, ch_width, nticks );
+      std::vector<double> z_vecc = CombineTicks( z_vec, ch_width, nticks );
+      if( fLogLevel >= 3 ) std::cout<<"  Combined all ArrayFromWire: "<<std::endl;
+      std::vector<double> u_veccs = ScaleArray( u_vecc, 1, 225 );
+      std::vector<double> v_veccs = ScaleArray( v_vecc, 1, 225 );
+      std::vector<double> z_veccs = ScaleArray( z_vecc, 1, 225 );
+      if( fLogLevel >= 3 ) std::cout<<"  Scaled all ArrayFromWire: "<<std::endl;
+      //Logs
+      if( fLogLevel >= 3 )
       {
-        //if( i % ch_width == 0 ) std::cout<<std::endl<<"line "<<t++<<": ";
-        if( i % ch_width == 0 ) std::cout<<std::endl<<"[ ";
-        std::cout<<Form("(%d,%d,%d), ",(int)u_veccs[i],(int)v_veccs[i],(int)z_veccs[i]);
-        if( i % ch_width == (unsigned int) (ch_width-1) ) std::cout<<"],";
-        //if (u_vec[i]==0) continue;
-        //auto ct = CalculateCT(i,ch_width,tick_width);
-        //std::cout<<Form("    Pts: (%d, %d, %.2f)", ct.first,ct.second,u_vec[i])<<std::endl;
-      }
-      std::cout<<std::endl<<"  == End Print Array Values: "<<std::endl<<
-                             Form("  are wires the same? uv, uz, vz: %d,%d,%d",
-                                 (u_vec==v_vec),
-                                 (u_vec==z_vec),
-                                 (v_vec==z_vec) )<<std::endl;
-    }//end Logs
+        std::cout<<"  Print Array Values: "<<std::endl;
+        //int t=0;
+        for( unsigned int i = 0; i<z_vecc.size(); i++ )
+        {
+          //if( i % ch_width == 0 ) std::cout<<std::endl<<"line "<<t++<<": ";
+          if( i % ch_width == 0 ) std::cout<<std::endl<<"[ ";
+          std::cout<<Form("(%d,%d,%d), ",(int)u_veccs[i],(int)v_veccs[i],(int)z_veccs[i]);
+          if( i % ch_width == (unsigned int) (ch_width-1) ) std::cout<<"],";
+          //if (u_vec[i]==0) continue;
+          //auto ct = CalculateCT(i,ch_width,tick_width);
+          //std::cout<<Form("    Pts: (%d, %d, %.2f)", ct.first,ct.second,u_vec[i])<<std::endl;
+        }
+        std::cout<<std::endl<<"  == End Print Array Values: "<<std::endl<<
+                               Form("  are wires the same? uv, uz, vz: %d,%d,%d",
+                                   (u_vec==v_vec),
+                                   (u_vec==z_vec),
+                                   (v_vec==z_vec) )<<std::endl;
+      }//end Logs
+
+      WriteNumPy( mCluster, wirelist );
+    }
+
   }
 
 
@@ -181,10 +213,56 @@ void wireana::WireAna::beginJob() {
   fTree->Branch("event", &event);
   fTree->Branch("MC", &MC);
   DeclareTruthBranches(fTree, truth_data);
+
+
+  //setup npywriter
+  c2numpy_init(&npywriter, fDumpFileName, fDumpMaxRow);
+   
+
+  c2numpy_addcolumn(&npywriter, "RUN", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "SUBRUN", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "EVENT", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "MC", C2NUMPY_UINT16 );
+  //setup image format
+  c2numpy_addcolumn(&npywriter, "NChannels", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "NTicks", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "RTicks", C2NUMPY_UINT16 );
+  // generator code
+  c2numpy_addcolumn(&npywriter, "GeneratorCode", C2NUMPY_UINT16 );//0 NueScatter, 1 CC, 2 Radiological
+  //check match code
+  c2numpy_addcolumn(&npywriter, "LabelMatchCode", C2NUMPY_UINT16 );//views: 0 did not match, 1 matched
+  c2numpy_addcolumn(&npywriter, "TrkMatchCode", C2NUMPY_UINT16 );//trkid: 0 did not match, 1 matched
+
+  //setup truth information
+  c2numpy_addcolumn(&npywriter, "NPhoton", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "NProton", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "NNeutron", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "NMeson", C2NUMPY_UINT16 );
+  c2numpy_addcolumn(&npywriter, "NNucleus", C2NUMPY_UINT16 );
+
+  c2numpy_addcolumn(&npywriter, "Nu_Px", C2NUMPY_FLOAT );
+  c2numpy_addcolumn(&npywriter, "Nu_Py", C2NUMPY_FLOAT );
+  c2numpy_addcolumn(&npywriter, "Nu_Pz", C2NUMPY_FLOAT );
+  c2numpy_addcolumn(&npywriter, "Part_Px", C2NUMPY_FLOAT );
+  c2numpy_addcolumn(&npywriter, "Part_Py", C2NUMPY_FLOAT );
+  c2numpy_addcolumn(&npywriter, "Part_Pz", C2NUMPY_FLOAT );
+
+
+  //setup index data
+  for( int i = 0; i < image_size; i++ )
+  {
+    for( int v = 0; v < 3; v++ )
+    {
+      std::string name=Form("%s_%08d", fViewMap[v].c_str(),i);
+      c2numpy_addcolumn(&npywriter, name.c_str(), C2NUMPY_FLOAT);
+    }
+  }
+
 }
 
 void wireana::WireAna::endJob()
 {
+  c2numpy_close(&npywriter);
 }
 
 
@@ -364,8 +442,11 @@ wireana::WireAna::BuildPlaneViewROIMap(  std::vector<art::Ptr<recob::Wire>> &wir
     int planeID = chan/fNChanPerApa;
     recob::Wire::RegionsOfInterest_t signalROI = wire->SignalROI();
     for ( auto datarange: signalROI.get_ranges() ) {
+      if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): create roi"<<std::endl;
       wireana::roi thisroi( wire, datarange );
+      if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): created roi"<<std::endl;
       plane_view_roi_map[planeID][wire->View()].push_back( thisroi );
+      if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): push_back -- done"<<std::endl;
     }
   }
 }
@@ -509,11 +590,15 @@ wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
               cluster.channel_min, cluster.channel_max, 
               cluster.begin_index, cluster.end_index )
             <<std::endl;
-          std::cout<<
-            Form("   Truth Label: %s, Leading PDG: %d, Leading #electron: %f",
-               cluster.label.c_str(), cluster.pdg_energy_list.front().first,
-                cluster.pdg_energy_list.front().second.first)
-            <<std::endl;
+          if (cluster.label_code != 0 )
+          {
+            std::cout<<
+              Form("   Truth Label: %s, Leading PDG: %d, Leading #electron: %f",
+                 cluster.label.c_str(), cluster.pdg_energy_list.front().first,
+                  cluster.pdg_energy_list.front().second.first)
+              <<std::endl;
+          }
+          else std::cout<<"   Has no Truth"<<std::endl;
           std::cout<<
             Form("   centroid (Channel,Ticks): (%f, %f). width(c,t):(%i,%i)", 
                cluster.abs_centroidChannel, cluster.abs_centroidIndex,
@@ -554,11 +639,11 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
     int roi_channel = roi.wire->Channel();
     if (fLogLevel>=10) 
     {
-      std::cout<<"look at channel "<<roi_channel<<std::endl;
-      std::cout<<"Map Size: "<<ch_w_sc.size()<<std::endl;
-      std::cout<<"Channel ID Exists? "<< (ch_w_sc.find(roi_channel) != ch_w_sc.end())<<std::endl;
-      std::cout<<"Wire Exist? "<<ch_w_sc[ roi_channel ].first->Channel()<<std::endl;
-      std::cout<<"SimChannel Exist? "<<ch_w_sc[ roi_channel ].second->Channel()<<std::endl;
+      std::cout<<"TagROITruth:look at channel "<<roi_channel<<std::endl;
+      std::cout<<"            Map Size: "<<ch_w_sc.size()<<std::endl;
+      std::cout<<"            Channel ID Exists? "<< (ch_w_sc.find(roi_channel) != ch_w_sc.end())<<std::endl;
+      std::cout<<"            Wire Exist? "<<ch_w_sc[ roi_channel ].first->Channel()<<std::endl;
+      std::cout<<"            SimChannel Exist? "<<ch_w_sc[ roi_channel ].second->Channel()<<std::endl;
     }
     art::Ptr<sim::SimChannel> &simchannel = ch_w_sc[ roi_channel ].second;
 
@@ -567,12 +652,13 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
     double endTDC   = clock.TPCTick2TDC( roi.end_index );
     if (fLogLevel>=10) 
     {
-      std::cout<<"SimChannel exist? "<<simchannel->Channel()<<std::endl;
-      std::cout<<"startTDC, endTDC: "<<startTDC<<", "<<endTDC<<std::endl;
+      std::cout<<"            SimChannel exist? "<<simchannel->Channel()<<std::endl;
+      std::cout<<"            startTDC, endTDC: "<<startTDC<<", "<<endTDC<<std::endl;
     }
 
     //! Get all the IDE (Ionization at a point of the TPC sensitive volume. ) that deposited energy in the datarange_t
     std::vector< sim::IDE >  ide_vec = simchannel->TrackIDsAndEnergies(startTDC, endTDC);
+    if (fLogLevel>=10) std::cout<<"           ide_vec size: "<<ide_vec.size()<<std::endl;
 
     if( ide_vec.size() == 0 ) continue;
 
@@ -582,6 +668,7 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
     //!pair<trkid, pair<numElectrons, energy>> , sum up n electrons and total energy within the ROI for each trkid
 
     //! fill vector of ide
+    if (fLogLevel>=10) std::cout<<"           fill truth loop: begin"<<std::endl;
     for( auto ide : ide_vec ) //loop 5
     {
       //! check if track has been saved in the trkID_sum vector.
@@ -604,27 +691,53 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
       }
     }// end loop 5
 
+    if (fLogLevel>=10) std::cout<<"           fill truth loop: end"<<std::endl;
+
     //! sort vector of (trkid,(#electron, energy)) by # electrons
     //! could also sort by energy but #e should be a more direct observable?
   }//end loop 1
 
 
+  if (fLogLevel>=10) std::cout<<"   filled all trkID_sum"<<std::endl;
   // Once all ROI has been analyzed, sort trkID by #electrons
   std::sort( trkID_sum.begin(), trkID_sum.end(), [](auto &a, auto &b){ return a.second.first > b.second.first;} );
+  if (fLogLevel>=10) std::cout<<"   trkID_sum sorted"<<std::endl;
 
   cluster.trkID_sum = trkID_sum;
-  cluster.label = this->trkid_to_label_map[ trkID_sum[0].first ];
+  bool hasMCTrack =  trkID_sum.size() > 0;
+  if( hasMCTrack ) cluster.label = this->trkid_to_label_map[ trkID_sum[0].first ];
+  else cluster.label = "None";
 
+  if( cluster.label == "None" ) cluster.label_code = kNone;
+  else if( cluster.label == "NuEScatter" ) cluster.label_code = kElastic;
+  else if( cluster.label == "marley" ) cluster.label_code = kMarley;
+  else cluster.label_code = kOthers;
+
+  if (fLogLevel>=10) std::cout<<"   label set"<<std::endl;
   //Grep the most deposited particle first
+
+  if( !hasMCTrack ) return;
+  
   int trkid = trkID_sum.front().first;
   const simb::MCParticle * part = PIS->TrackIdToMotherParticle_P(trkid);
   art::Ptr<simb::MCTruth> truth = PIS->TrackIdToMCTruth_P(trkid);
-  std::string label = this->trkid_to_label_map[trkid];
+
   if ( truth->NeutrinoSet() )
   {
     cluster.truthFromNeutrino = true;
     const simb::MCNeutrino neutrino = truth->GetNeutrino();
     cluster.momentum_neutrino = neutrino.Nu().Momentum();
+    for( int ipart = 0; ipart < truth->NParticles(); ++ipart )
+    {
+      int pdg = truth->GetParticle( ipart ).PdgCode();
+      if (abs(pdg) == 12 || abs(pdg) == 14 || abs(pdg) == 16) cluster.n_nu++;
+      else if(abs(pdg) == 11 || abs(pdg) == 13 || abs(pdg) == 15) cluster.n_lepton++;
+      else if (abs(pdg) == 2212) cluster.n_proton++;
+      else if (abs(pdg) == 2112) cluster.n_neutron++;
+      else if (abs(pdg) == 22 ) cluster.n_photon++;
+      else if (abs(pdg)>=100 && abs(pdg)<600 ) cluster.n_meson++;
+      else if (abs(pdg)>= 1e10 ) cluster.n_nucleus++;
+    }
   }
   cluster.momentum_part = part->Momentum();
 
@@ -640,28 +753,50 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
 std::vector<double>
 wireana::WireAna::GetArrayFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist, wireana::roicluster &cluster, int channel_width, int tick_width )
 {
-  
+  if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("GetArrayFromWire::Log: begin")<<std::endl;
+  }
+ 
   double centroid_channel = cluster.abs_centroidChannel, centroid_tick = cluster.abs_centroidIndex;
-  unsigned int c0,t0;
+  int c0,t0;
   c0= centroid_channel - channel_width/2. + 1;
   t0= centroid_tick - tick_width/2.;
   std::vector<double> ret( channel_width*tick_width, 0 );
+  if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("GetArrayFromWire::Log:  c(c,t):(%.2f, %.2f). (c0,t0):(%d,%d). cpos(%d,%d) ",centroid_channel, centroid_tick, c0, t0, int(centroid_channel-c0), int(centroid_tick-t0))<<std::endl;
+  }
   auto ptr1 = wirelist.begin();
-  while ( (*ptr1)->Channel() < c0 ) ++ptr1; //increment ptr1 until it reaches the first channel within range
+  while ( (int) (*ptr1)->Channel() < c0 ) ++ptr1; //increment ptr1 until it reaches the first channel within range
+  //while (  ptr1 != wirelist.end() ) 
+  //{
+  //  if( (*ptr1)->Channel() < c0 ) ptr1++;
+  //  else break;
+  //}
   auto ptr_end = ptr1;
-  while ( (*ptr_end)->Channel() < c0+channel_width ) ++ptr_end; 
+  while ((int)  (*ptr_end)->Channel() < c0+channel_width ) 
+  {
+    ++ptr_end; //increment ptr1 until it reaches the first channel within range
+    if( ptr_end == wirelist.end() ) break;
+  }
+  //while (  ptr_end != wirelist.end() ) 
+  //{
+  //  if( (*ptr_end)->Channel() < c0+channel_width ) ++ptr_end; 
+  //  else break;
+  //}
+  if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("                        Print ptr:")<<std::endl;
+    std::cout<<Form("                        (ch_begin,ch_end): (%d, %d)",(*ptr1)->Channel(),(*(ptr_end-1))->Channel() )<<std::endl;
+  }
+
+
   //increment ptr_end until it reaches the first channel outside the range. 
   //i.e. cfirst, clast = 1,5 --> width = 5
   //1+5 = 6 is the first channel outside the range
   //so ptr_end will end when channel >= 6 
   //
-  if( fLogLevel >= 3 )
-  {
-    std::cout<<Form("GetArrayFromWire::Log:  c(c,t):(%.2f, %.2f). (c0,t0):(%d,%d). cpos(%d,%d) ",centroid_channel, centroid_tick, c0, t0, int(centroid_channel-c0), int(centroid_tick-t0))<<std::endl;
-    std::cout<<Form("                        (ch_begin,ch_end): (%d, %d)",(*ptr1)->Channel(),(*(ptr_end-1))->Channel() )<<std::endl;
-  }
-
-
 
   for ( auto ptr = ptr1; ptr != ptr_end; ++ptr )
   {
@@ -674,7 +809,11 @@ wireana::WireAna::GetArrayFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist
       ret[index] = (*ptr)->SignalROI()[t0+i];
     }
   }
-  
+   if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("GetArrayFromWire::Log: processed")<<std::endl;
+  }
+ 
   return ret;
   
 }
@@ -757,6 +896,58 @@ wireana::WireAna::CalculateCT( int index, int c_width )
   int c = index%c_width;
   int t = index/c_width;
   return std::make_pair( c, t);
+}
+
+void
+wireana::WireAna::WriteNumPy( wireana::matchedroicluster& cluster,  std::vector<art::Ptr<recob::Wire>>& wirelist)
+{
+  if(cluster.clusters.size() != 3 ) return;
+
+  c2numpy_uint16(&npywriter, (unsigned int) run );
+  c2numpy_uint16(&npywriter, (unsigned int) subrun );
+  c2numpy_uint16(&npywriter, (unsigned int) event );
+  c2numpy_uint16(&npywriter, (unsigned int) MC );
+
+  c2numpy_uint16(&npywriter, (unsigned int) image_channel_width );
+  c2numpy_uint16(&npywriter, (unsigned int) image_tick_width );
+  c2numpy_uint16(&npywriter, (unsigned int) image_rebin_tick );
+
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.gencode() );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.labelmatch() );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.trkmatch());
+
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_photon );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_proton );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_neutron);
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_meson  );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_nucleus);
+
+  c2numpy_float(&npywriter, cluster.clusters[0].momentum_neutrino.Px() );
+  c2numpy_float(&npywriter, cluster.clusters[0].momentum_neutrino.Py() );
+  c2numpy_float(&npywriter, cluster.clusters[0].momentum_neutrino.Pz() );
+  c2numpy_float(&npywriter, cluster.clusters[0].momentum_part.Px() );
+  c2numpy_float(&npywriter, cluster.clusters[0].momentum_part.Py() );
+  c2numpy_float(&npywriter, cluster.clusters[0].momentum_part.Pz() );
+
+  std::vector<double> u_vec = GetArrayFromWire( wirelist, cluster.clusters[0], image_channel_width, image_tick_width );
+  std::vector<double> v_vec = GetArrayFromWire( wirelist, cluster.clusters[1], image_channel_width, image_tick_width );
+  std::vector<double> z_vec = GetArrayFromWire( wirelist, cluster.clusters[2], image_channel_width, image_tick_width );
+
+  std::shared_ptr<std::vector<double>> u_vecc = std::make_shared< std::vector<double> >( CombineTicks( u_vec, image_channel_width, image_rebin_tick )) ;
+  std::shared_ptr<std::vector<double>> v_vecc = std::make_shared< std::vector<double> >( CombineTicks( v_vec, image_channel_width, image_rebin_tick )) ;
+  std::shared_ptr<std::vector<double>> z_vecc = std::make_shared< std::vector<double> >( CombineTicks( z_vec, image_channel_width, image_rebin_tick )) ;
+
+  std::vector< std::shared_ptr<std::vector<double>> > vecc({ u_vecc,
+                                                             v_vecc,
+                                                             z_vecc } ); 
+  for( int i = 0; i < image_size; i++ )
+  {
+    for( int v = 0; v < 3; v++ )
+    {
+      std::string name=Form("%s_%08d", fViewMap[v].c_str(),i);
+      c2numpy_float(&npywriter, vecc[v]->at(i) );
+    }
+  }
 }
 
 DEFINE_ART_MODULE(wireana::WireAna)

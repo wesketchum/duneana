@@ -44,6 +44,8 @@
 
 #include "art_root_io/TFileService.h"
 
+#include "c2numpy.h"
+
 // ROOT includes
 #include "TTree.h"
 #include "TH1F.h"
@@ -138,6 +140,14 @@ private:
   float fDrift;
   float fPitch;
 
+  float fDeltaMetric;
+
+  int image_channel_width;
+  int image_tick_width;
+  int image_rebin_tick;
+  int image_size;
+
+
   /////////////////////////////////////////////
   // Backtracker services
 
@@ -162,6 +172,8 @@ private:
   void PrintClusters( std::vector<wirecluster> &clusters );
   void PrintROIs( const std::vector<roi> &ROIs);
 
+  void WriteNumPy( matchedroicluster& cluster, std::vector<art::Ptr<recob::Wire>>& wirelist );
+
   /////////////////////////////////////////////
   // Cluster Matching
 
@@ -178,6 +190,9 @@ private:
   const art::InputTag fWireProducerLabel; 
   const art::InputTag fSimChannelLabel;
   const art::InputTag fSimulationProducerLabel;
+
+  std::string fDumpFileName;
+  int fDumpMaxRow;
 
 
   /////////////////////////////////////////////
@@ -220,6 +235,9 @@ private:
   int CalculateIndex( int c, int t, int c_width, int t_width );
   std::pair<int,int> CalculateCT( int index, int c_width );
 
+  std::map<int, std::string> fViewMap;
+
+  c2numpy_writer npywriter;
 };
 
 
