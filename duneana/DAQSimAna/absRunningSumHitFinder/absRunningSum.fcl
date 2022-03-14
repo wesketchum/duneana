@@ -1,0 +1,50 @@
+BEGIN_PROLOG
+
+absrunningsumtppass1: 
+{
+  module_type: "absRunningSumTPFinder"
+  InputTag:    "simwire"
+  finder1: 
+  {
+    tool_type: "absRunningSumTPFinderPass1"
+    UseSignalKill: true        
+    SignalKillLookahead: 6
+    SignalKillThreshold: 15
+    SignalKillNContig:   10
+  }
+}
+
+absrunningsumtppass2: 
+{
+  module_type: "absRunningSumTPFinder"
+  InputTag:    "simwire"
+  finder1: 
+  {
+    tool_type: "absRunningSumTPFinderPass2"
+    UseSignalKill: true        
+    SignalKillLookahead: 6
+    SignalKillThreshold: 15
+    SignalKillNContig:   10
+    ThresholdInSigma: 	 5
+  }
+}
+
+absrunningsumtppass1_protodune: 
+{
+  @table::absrunningsumtppass1
+  InputTag: "tpcrawdecoder:daq:DecoderandReco"
+}
+
+absrunningsumtppass1frugal: 
+{
+   module_type: "absRunningSumTPFinder"	
+   InputTag:    "simwire"
+   finder1: {
+     tool_type: "absRunningSumTPFinderPass1"
+     UseSignalKill: false
+     FrugalPedestalNContig: 10
+     FrugalPedestalNContigAbsRS: 15
+   }
+}
+
+END_PROLOG
