@@ -3,6 +3,7 @@ art_make( BASENAME_ONLY MODULE_LIBRARIES
   larcore::Geometry_Geometry_service
   larcorealg::Geometry
   lardataobj::RawData
+  lardata::DetectorPropertiesService
   larsim::MCCheater_BackTrackerService_service
   larsim::MCCheater_PhotonBackTrackerService_service
   larsim::MCCheater_ParticleInventoryService_service
