@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cmath>
+#include <cmath>
 
 #define UNCLASSIFIED -1
 #define CORE_POINT 1
@@ -89,6 +90,12 @@ namespace wireana{
     double centroid=0;
     double abs_centroid=0;
     bool hasTrueSignal = false;
+    int true_leading_pdg=-999999;
+    double true_leading_energy_deposit = 0;
+    double true_leading_electron_deposit = 0;
+    double true_energy_deposit = 0;
+    double true_electron_deposit = 0;
+    double tdc_hit_fraction = 0;
 
     void updateroi( const art::Ptr<recob::Wire> &wire, recob::Wire::RegionsOfInterest_t::datarange_t r)
     {
@@ -539,15 +546,18 @@ wireana::WireAnaDBSCAN::calculateDistance( const roi &r1, const roi &r2, float d
 class wireana::ROIMatcher
 {
   public:
-  ROIMatcher(){
+  ROIMatcher(double dist = 20 /*mm*/){
     fGeometry = &*(art::ServiceHandle<geo::Geometry const>());
+    SetMatchDistance(dist);
   }
   ~ROIMatcher(){}
 
   void Reset();
   void SetData( PlaneViewROIClusterMap pvrm ) { m_planeViewRoillusterMap = pvrm; }
+  void SetMatchDistance( float dist = 20 /*mm*/ ) { m_minMatchDistance = dist ;}
   void MatchROICluster();
   void CleanDuplicates( float delta = 0. );
+  void SortROIClustersBySize();
   const std::vector<matchedroicluster> &GetMatchedClusters() { return m_matchedclusters; }
 
   private:
@@ -556,6 +566,10 @@ class wireana::ROIMatcher
 
   double DeltaT(const roicluster& r1, const roicluster& r2);
   double DeltaC(const roicluster& r1, const roicluster& r2);
+
+  std::vector<geo::Point_t> GetIntersectionPoints(const roicluster& r1, const roicluster& r2);
+  double DeltaDist(const roicluster& r1, const roicluster& r2, const roicluster& r3);
+
   double DeltaN(const roicluster& r1, const roicluster& r2);
   double DeltaCT( const wireana::roicluster& r1, const wireana::roicluster &r2 );
 
@@ -563,6 +577,8 @@ class wireana::ROIMatcher
 
   PlaneViewROIClusterMap m_planeViewRoillusterMap;
   std::vector<matchedroicluster> m_matchedclusters; 
+
+  double m_minMatchDistance;
 };
 
 void 
@@ -619,8 +635,8 @@ wireana::ROIMatcher::DeltaC(const roicluster& r1, const roicluster& r2)
       {
         for( auto &w2: cwidmap[c2] )
         {
-          geo::Point_t intersection_point;
           if( w1.asTPCID() != w2 ) continue;
+          geo::Point_t intersection_point;
           intersect = fGeometry->WireIDsIntersect(w1,w2,intersection_point);
           if( intersect ) break;
         }
@@ -629,6 +645,58 @@ wireana::ROIMatcher::DeltaC(const roicluster& r1, const roicluster& r2)
     };
   }
   return ret;
+}
+
+std::vector<geo::Point_t>
+wireana::ROIMatcher::GetIntersectionPoints( const roicluster& r1, const roicluster& r2)
+{
+
+  std::vector<geo::Point_t> points;
+  int c1 = std::round(r1.centroidChannel), c2 = std::round(r2.centroidChannel);
+  std::vector< geo::WireID > c1wid = fGeometry->ChannelToWire( c1 );
+  std::vector< geo::WireID > c2wid = fGeometry->ChannelToWire( c2 );
+  for( auto &w1: c1wid )
+  {
+    for( auto &w2:c2wid )
+    {
+      geo::Point_t point(-99999,-99999,-99999);
+      if ( w1.asTPCID() != w2.asTPCID() ) continue;
+      if ( w1.asPlaneID() == w2.asPlaneID() ) continue;
+      bool intersect = fGeometry->WireIDsIntersect(w1,w2,point);
+      if (intersect) points.push_back( point );
+    }
+  }
+  return points;
+}
+
+double 
+wireana::ROIMatcher::DeltaDist( const roicluster &u, const roicluster &v, const roicluster&z)
+{
+  auto uv = wireana::ROIMatcher::GetIntersectionPoints(u,v);
+  auto uz = wireana::ROIMatcher::GetIntersectionPoints(u,z);
+  auto vz = wireana::ROIMatcher::GetIntersectionPoints(v,z);
+  if (uv.size() == 0 || uz.size() == 0 || vz.size() == 0 ) return false;
+  //then find the maximum delta distance between each triplet
+  std::vector<double> distances;
+
+  std::vector<double> p12d, p13d, p23d;
+  for( auto &p1 : uv )
+  {
+    for (auto &p2: uz )
+    {
+      double d12 = (p1-p2).R();
+      for (auto &p3: vz )
+      {
+        double d13 = (p1-p3).R();
+        double d23 = (p2-p3).R();
+        double max = d12;
+        if( d13>max ) max = d13;
+        if( d23>max ) max = d23;
+        distances.push_back(max);
+      }
+    }
+  }
+  return *std::min_element( distances.begin(), distances.end() );
 }
 
 double 
@@ -641,6 +709,12 @@ wireana::ROIMatcher::DeltaCT( const wireana::roicluster& r1, const wireana::roic
   return dT+dN+dC;
 }
 
+void 
+wireana::ROIMatcher::SortROIClustersBySize()
+{
+  std::sort(m_matchedclusters.begin(), m_matchedclusters.end(),
+      [](const auto &a, const auto &b){ return a.totalROIs > b.totalROIs; });
+}
 void 
 wireana::ROIMatcher::MatchROICluster()
 {
@@ -662,6 +736,8 @@ wireana::ROIMatcher::MatchROICluster()
         for( auto & rcz: pvv.second[geo::kZ] )
         {
           if( rcz.clusterID < 0 ) continue;
+          double dist = DeltaDist( rcu,rcv,rcz );
+          if( dist > m_minMatchDistance ) continue;
           int n_rcz = rcz.ROIs.size();
           double uz = DeltaCT(rcu,rcz);
           double vz = DeltaCT(rcv,rcz);

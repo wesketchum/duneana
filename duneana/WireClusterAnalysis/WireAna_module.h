@@ -49,6 +49,7 @@
 // ROOT includes
 #include "TTree.h"
 #include "TH1F.h"
+#include "TH2F.h"
 #include "TProfile.h"
 #include "TFile.h"
 #include "TROOT.h"
@@ -98,6 +99,16 @@ namespace wireana {
     double truth_had_vtx_z;
     double truth_had_vtx_t;
     double truth_had_PDG;
+
+    // //ROI Info
+    int nROIs;
+    std::vector<int> roi_has_truth;
+    std::vector<int> lead_pdg;
+    std::vector<double> lead_pdg_total_energy;
+    std::vector<double> lead_pdg_total_charge;
+    std::vector<double> total_energy;
+    std::vector<double> total_charge;
+    std::vector<double> hit_fraction;
   };
 
 
@@ -147,6 +158,8 @@ private:
   int image_rebin_tick;
   int image_size;
 
+  float fHistEnergyMax;
+  float fHistChargeMax;
 
   /////////////////////////////////////////////
   // Backtracker services
@@ -155,6 +168,7 @@ private:
   // config
   int fLogLevel;
   bool fDoAssns;
+  bool fMakeCluster;
 
   /////////////////////////////////////////////
   // Wire Filtering/Clustering Functions
@@ -181,6 +195,41 @@ private:
   // Declare output data
   TTree *fTree;
 
+  std::map<std::string, TH2F* > TH2FMap;
+
+  std::vector<std::string> selTypes{"","_neutrino","_rad"};
+  enum SType{
+    kSAll, kSNeutrino, kSRad, kSEnd
+  };
+  std::vector<std::string> partTypes{"","_electron","_proton","_neutron","_photon","_other"};
+  enum PType {
+    kAll, kElectron, kProton, kNeutron, kPhoton, kNuc, kPEnd
+  };
+  //selTypes=std::vector<std::string>({"","_neutrino","_rad"});
+  //partTypes=std::vector<std::string>({"","_electron","_proton","_neutron","_photon","_other"});
+
+  void FillHistogram(std::vector<float> energies, std::vector<float>charges ,SType s, bool inROI);
+  //TH2F* TrueEnergyChargeDeposited;
+  //TH2F* TrueEnergyChargeDepositedInROI; //Filled in TagROITruth
+
+  //TH2F* TrueEnergyChargeDeposited_electron;
+  //TH2F* TrueEnergyChargeDepositedInROI_electron; //Filled in TagROITruth
+  //TH2F* TrueEnergyChargeDeposited_proton;
+  //TH2F* TrueEnergyChargeDepositedInROI_proton; //Filled in TagROITruth
+  //TH2F* TrueEnergyChargeDeposited_neutron;
+  //TH2F* TrueEnergyChargeDepositedInROI_neutron; //Filled in TagROITruth
+  //TH2F* TrueEnergyChargeDeposited_photon;
+  //TH2F* TrueEnergyChargeDepositedInROI_photon; //Filled in TagROITruth
+  //TH2F* TrueEnergyChargeDeposited_other;
+  //TH2F* TrueEnergyChargeDepositedInROI_other; //Filled in TagROITruth
+
+
+  TH1F* TrueEnergyDeposited;
+  TH1F* TrueEnergyDepositedInROI; //Filled in TagROITruth
+
+  TH1F* TrueChargeDeposited;
+  TH1F* TrueChargeDepositedInROI; //Filled in TagROITruth
+  float fECMin; //minimum energy and charge to begin accumulation
 
 
 
@@ -193,7 +242,9 @@ private:
 
   std::string fDumpFileName;
   int fDumpMaxRow;
+  int fDumpNClusters;
 
+  std::string fTreeName;
 
   /////////////////////////////////////////////
   // Event level information
@@ -214,8 +265,10 @@ private:
 
   // Truth tagging
   void FillTrackIDtoLabelMap( art::Event const& evt );
+  void TagAllROIClusterTruth( const detinfo::DetectorClocksData &clock );
+  void TagROIClusterTruth( wireana::roicluster &cluster, const detinfo::DetectorClocksData &clock );
   void TagAllROITruth( const detinfo::DetectorClocksData &clock );
-  void TagROITruth( wireana::roicluster &roi, const detinfo::DetectorClocksData &clock );
+  void TagROITruth( wireana::roi &roi, const detinfo::DetectorClocksData &clock );
   art::ServiceHandle<cheat::ParticleInventoryService> PIS;
 
   ////////////////////////////////////////////
@@ -238,6 +291,7 @@ private:
   std::map<int, std::string> fViewMap;
 
   c2numpy_writer npywriter;
+
 };
 
 

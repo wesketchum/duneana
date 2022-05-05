@@ -12,6 +12,7 @@ wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
   fDoAssns            = pset.get<bool>("DoAssns", false);
   fNChanPerApa        = pset.get<int>("ChannelPerApa", 2560);
   fNTicksPerWire      = pset.get<int>("TickesPerWire", 6000);
+  fMakeCluster        = pset.get<bool>("MakeCluster", true );
   auto const* geo = lar::providerFrom<geo::Geometry>();
   fNPlanes = geo->Nplanes();
 
@@ -29,10 +30,25 @@ wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
 
   fDumpFileName      = pset.get<std::string>("DUMPFILENAME", "out.npy");
   fDumpMaxRow        = pset.get<int>("DUMPMAXROW", 50000);
+  fDumpNClusters     = pset.get<int>("DUMPNCLUSTERS",-1);
+
+
+  fHistEnergyMax         = pset.get<float>("Histo_EMax", 10);
+  fHistChargeMax         = pset.get<float>("Histo_CMax", 10000);
+
+  fTreeName          = pset.get<std::string>("TREENAME", "wireana");
 
   fViewMap[0]   =   "U";
   fViewMap[1]   =   "V";
   fViewMap[2]   =   "Z";
+
+  //selTypes=std::vector<std::string>({"","_neutrino","_rad"});
+  //partTypes=std::vector<std::string>({"","_electron","_proton","_neutron","_photon","_other"});
+  if (fLogLevel >= 3 )
+  {
+    std::cout<<"Histogram Selection Types: "<<std::endl;
+    for( auto st: selTypes ) std::cout<<selTypes.size()<<std::endl;
+  }
 }
 
 void wireana::WireAna::analyze(art::Event const & evt) {
@@ -49,6 +65,9 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   std::cout<<"########## EvtNo."<<event<<std::endl;
 
   MC = !evt.isRealData();
+  /// FillTruthInfo to internal data objects
+  /// i.e. trkid_to_label_map
+  if (MC) FillTrackIDtoLabelMap( evt );
 
   ////////////////////////////////////////////////////////////
   //Build Wire SimChanel List
@@ -58,6 +77,8 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   std::vector<art::Ptr<recob::Wire>> wirelist;
   if (evt.getByLabel(fWireProducerLabel, wireListHandle)) 
     art::fill_ptr_vector(wirelist, wireListHandle);
+  if ( fLogLevel >= 3 )
+    std::cout<<"Size of Wirelist: "<<wirelist.size()<<std::endl;
   SortWirePtrByChannel( wirelist, true );
 
   art::Handle<std::vector<sim::SimChannel>> simChannelListHandle;
@@ -66,11 +87,79 @@ void wireana::WireAna::analyze(art::Event const & evt) {
     art::fill_ptr_vector(channellist, simChannelListHandle);
   SortWirePtrByChannel( channellist, true );
 
+
   // //Get channel-> wire,simchannel map
+  if( fLogLevel >= 3 ) std::cout<<"Fill ch_w_sc"<<std::endl;
   for( auto w: wirelist ) 
     ch_w_sc[ w->Channel() ].first = w;
   for( auto w: channellist )
   {
+
+    //accumulate energy and charge for all channels
+    for( auto &tdcide: w->TDCIDEMap() )
+    {
+      std::vector<float> energies(partTypes.size(),fECMin );
+      std::vector<float> charges(partTypes.size(),fECMin );
+      std::vector<float> energiesNeut(partTypes.size(),fECMin );
+      std::vector<float> chargesNeut(partTypes.size(),fECMin );
+      std::vector<float> energiesRad(partTypes.size(),fECMin );
+      std::vector<float> chargesRad(partTypes.size(),fECMin );
+
+      for( auto &ide: tdcide.second )
+      {
+        
+        if( fLogLevel >= 3 ) std::cout<<"ide.trackID: "<<ide.trackID<<std::endl;
+        bool isSignal = trkid_to_label_map[ ide.trackID ] == "NuEScatter" || trkid_to_label_map[ ide.trackID ] == "marley";
+        int pdg = PIS->TrackIdToParticle_P( ide.trackID )->PdgCode();
+        float energy = ide.energy;
+        float numElectrons = ide.numElectrons;
+        energies[kAll]+=energy;
+        charges[kAll]+=numElectrons;
+        int partType = -1;
+        if( abs(pdg) == 11 || abs(pdg) == 13 || abs(pdg) == 15 )
+        {
+          partType = kElectron;
+        } else if( abs(pdg) == 2212)
+        {
+          partType = kProton;
+        } else if(abs(pdg) == 2112)
+        {
+          partType = kNeutron;
+        } else if(abs(pdg) == 22)
+        {
+          partType = kPhoton;
+        } else
+        {
+          partType = kNuc;
+        }
+        //parsed particle, accumulate energy
+        energies[partType]+=energy; charges[partType]+=numElectrons;
+        if( isSignal )
+        {
+          energiesNeut[partType]+=energy; chargesNeut[partType]+=numElectrons;
+        }
+        else
+        {
+          energiesRad[partType]+=energy; chargesRad[partType]+=numElectrons;
+        }
+      }
+
+      if( fLogLevel >= 3 ) std::cout<<"FillHistogram: begin"<<std::endl;
+      FillHistogram( energies, charges, kSAll, false );
+      FillHistogram( energiesNeut, chargesNeut, kSNeutrino, false );
+      FillHistogram( energiesRad, chargesRad, kSRad, false );
+      if( fLogLevel >= 3 ) std::cout<<"FillHistogram: end"<<std::endl;
+
+      //TH2FMap["TrueEnergyChargeDeposited"]->Fill(energy,charge);
+      //TH2FMap["TrueEnergyChargeDeposited_electron"]->Fill(energy_e,charge_e);
+      //TH2FMap["TrueEnergyChargeDeposited_proton"]->Fill(energy_p,charge_p);
+      //TH2FMap["TrueEnergyChargeDeposited_photon"]->Fill(energy_gamma,charge_gamma);
+      //TH2FMap["TrueEnergyChargeDeposited_neutron"]->Fill(energy_n,charge_n);
+      //TH2FMap["TrueEnergyChargeDeposited_other"]->Fill(energy_o,charge_o);
+      TrueEnergyDeposited->Fill(energies[0]);
+      TrueChargeDeposited->Fill(charges[0]);
+    }
+
     if ( ch_w_sc.find( w->Channel() ) != ch_w_sc.end() ) 
     {
       ch_w_sc[ w->Channel() ].second = w;
@@ -81,9 +170,6 @@ void wireana::WireAna::analyze(art::Event const & evt) {
     }
   }
 
-  /// FillTruthInfo to internal data objects
-  /// i.e. trkid_to_label_map
-  FillTrackIDtoLabelMap( evt );
   //We can now print truth particles
 
   //! Since ROI Tag Truth will supply the leading trkid, now need a method to convert trkid to MCPart and the truthlabel.
@@ -102,103 +188,123 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): Start"<<std::endl;
   BuildPlaneViewROIMap( wirelist );
   if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): End"<<std::endl;
-  if( fLogLevel>=10 ) std::cout<<"BuildInitialROIClusters(): Start"<<std::endl;
-  BuildInitialROIClusters();
-  if( fLogLevel>=10 ) std::cout<<"BuildInitialROIClusters(): Done"<<std::endl;
-  if ( MC ) 
-  {
-    TagAllROITruth( clockData );
-    if( fLogLevel>=10 ) std::cout<<"TagAllROITruth(): Done"<<std::endl;
-  }
-
-  //Match ROI across views
-  ROIMatcher matcher;
-  matcher.SetData(plane_view_roicluster_map);
-  matcher.MatchROICluster();
-  if( fLogLevel>=10 ) std::cout<<"matcher.MatchROICluster(): Done"<<std::endl;
-  matcher.CleanDuplicates(fDeltaMetric);
-  bool hasCluster = (matcher.GetMatchedClusters().size() != 0 );
-  if( hasCluster )
-  {
-    //Logs
-    if( fLogLevel >= 3 )
-    {
-      std::cout<<"  List Matched Clusters: "<<std::endl;
-      int i = 0;
-      for( auto mc : matcher.GetMatchedClusters() )
-      {
-        if (i>10) break;
-        std::cout<<"    Item "<<i<<", PlaneID: "<<mc.planeid<<std::endl
-                 <<"        metric: "<<mc.metric<<std::endl;
-        for( int v=0;v<3;v++ )
-        {
-         std::cout<<Form("        View: %d, tick(%d, %d, %d), ch(%d, %d, %d)",
-                      mc.clusters[v].view,
-                      mc.clusters[v].begin_index,
-                      mc.clusters[v].end_index,
-                      mc.clusters[v].end_index-mc.clusters[v].begin_index,
-                      mc.clusters[v].channel_min,
-                      mc.clusters[v].channel_max, 
-                      mc.clusters[v].channel_max-mc.clusters[v].channel_min
-                      )<<std::endl;
-        }
-        ++i;
-      }
-    }//end Logs
-
-    for( auto  mCluster : matcher.GetMatchedClusters() )
-    {
-      //matchedroicluster mCluster = matcher.GetMatchedClusters().front();
-      int ch_width=image_channel_width,tick_width= image_tick_width, nticks=image_rebin_tick;
-      std::vector<double> u_vec = GetArrayFromWire( wirelist, mCluster.clusters[0], ch_width,tick_width);
-      std::vector<double> v_vec = GetArrayFromWire( wirelist, mCluster.clusters[1], ch_width,tick_width);
-      std::vector<double> z_vec = GetArrayFromWire( wirelist, mCluster.clusters[2], ch_width,tick_width);
-
-      if( fLogLevel >= 3 ) std::cout<<"  Got all ArrayFromWire: "<<std::endl;
-      std::vector<double> u_vecc = CombineTicks( u_vec, ch_width, nticks );
-      std::vector<double> v_vecc = CombineTicks( v_vec, ch_width, nticks );
-      std::vector<double> z_vecc = CombineTicks( z_vec, ch_width, nticks );
-      if( fLogLevel >= 3 ) std::cout<<"  Combined all ArrayFromWire: "<<std::endl;
-      std::vector<double> u_veccs = ScaleArray( u_vecc, 1, 225 );
-      std::vector<double> v_veccs = ScaleArray( v_vecc, 1, 225 );
-      std::vector<double> z_veccs = ScaleArray( z_vecc, 1, 225 );
-      if( fLogLevel >= 3 ) std::cout<<"  Scaled all ArrayFromWire: "<<std::endl;
-      //Logs
-      if( fLogLevel >= 3 )
-      {
-        std::cout<<"  Print Array Values: "<<std::endl;
-        //int t=0;
-        for( unsigned int i = 0; i<z_vecc.size(); i++ )
-        {
-          //if( i % ch_width == 0 ) std::cout<<std::endl<<"line "<<t++<<": ";
-          if( i % ch_width == 0 ) std::cout<<std::endl<<"[ ";
-          std::cout<<Form("(%d,%d,%d), ",(int)u_veccs[i],(int)v_veccs[i],(int)z_veccs[i]);
-          if( i % ch_width == (unsigned int) (ch_width-1) ) std::cout<<"],";
-          //if (u_vec[i]==0) continue;
-          //auto ct = CalculateCT(i,ch_width,tick_width);
-          //std::cout<<Form("    Pts: (%d, %d, %.2f)", ct.first,ct.second,u_vec[i])<<std::endl;
-        }
-        std::cout<<std::endl<<"  == End Print Array Values: "<<std::endl<<
-                               Form("  are wires the same? uv, uz, vz: %d,%d,%d",
-                                   (u_vec==v_vec),
-                                   (u_vec==z_vec),
-                                   (v_vec==z_vec) )<<std::endl;
-      }//end Logs
-
-      WriteNumPy( mCluster, wirelist );
-    }
-
-  }
-
-
   /////////////////////////////////////////////////////////////
-  // Build ROICluster
-  // Set Truth Info on roicluster
-
-  truth_data.truth_intType = 1;
-
+  // Set Truth Info on roi
+  if(MC)
+  {
+    truth_data.truth_intType = 1;
+    TagAllROITruth( clockData );
+    FillTruthBranches( evt, fTree, truth_data );
+  }
   fTree->Fill();
   std::unique_ptr<std::vector<recob::Wire>> outwires(new std::vector<recob::Wire>);
+
+
+  if(fMakeCluster)
+  {
+    if( fLogLevel>=10 ) std::cout<<"BuildInitialROIClusters(): Start"<<std::endl;
+    BuildInitialROIClusters();
+    if( fLogLevel>=10 ) std::cout<<"BuildInitialROIClusters(): Done"<<std::endl;
+    if ( MC ) 
+    {
+      TagAllROIClusterTruth( clockData );
+      if( fLogLevel>=10 ) std::cout<<"TagAllROIClusterTruth(): Done"<<std::endl;
+    }
+
+
+
+    //Match ROI across views
+    ROIMatcher matcher;
+    matcher.SetData(plane_view_roicluster_map);
+    matcher.MatchROICluster();
+    if( fLogLevel>=10 ) std::cout<<"matcher.MatchROICluster(): Done"<<std::endl;
+    matcher.CleanDuplicates(fDeltaMetric);
+    bool hasCluster = (matcher.GetMatchedClusters().size() != 0 );
+    if( hasCluster )
+    {
+      matcher.SortROIClustersBySize();
+      //Logs
+      if( fLogLevel >= 2 )
+      {
+        std::cout<<"  List Matched Clusters: "<<std::endl;
+        int i = 0;
+        for( auto mc : matcher.GetMatchedClusters() )
+        {
+          if (i == fDumpNClusters) break;
+          std::cout<<"    Item "<<i<<", PlaneID: "<<mc.planeid<<std::endl
+                   <<"        metric: "<<mc.metric<<std::endl;
+          for( int v=0;v<3;v++ )
+          {
+           std::cout<<Form("        View: %d, tick(%d, %d, %d), ch(%d, %d, %d)",
+                        mc.clusters[v].view,
+                        mc.clusters[v].begin_index,
+                        mc.clusters[v].end_index,
+                        mc.clusters[v].end_index-mc.clusters[v].begin_index,
+                        mc.clusters[v].channel_min,
+                        mc.clusters[v].channel_max, 
+                        mc.clusters[v].channel_max-mc.clusters[v].channel_min
+                        )<<std::endl;
+          }
+          if (MC)
+          {
+            std::cout<<"    Matched Truth::(GenCode, LabelMatch, GenTrkMatch): "<<std::endl;
+            std::cout<<Form("                   (%d, %d, %d) ", mc.gencode(), mc.labelmatch(),mc.trkmatch())<<std::endl;
+            std::cout<<Form("                   first label: %s",mc.clusters[0].label.c_str() )<<std::endl;
+          }
+          ++i;
+        }
+      }//end Logs
+
+      int nDumpedClusters = 0;
+      for( auto  mCluster : matcher.GetMatchedClusters() )
+      {
+        if (nDumpedClusters == fDumpNClusters ) break;
+
+        //matchedroicluster mCluster = matcher.GetMatchedClusters().front();
+        int ch_width=image_channel_width,tick_width= image_tick_width, nticks=image_rebin_tick;
+        std::vector<double> u_vec = GetArrayFromWire( wirelist, mCluster.clusters[0], ch_width,tick_width);
+        std::vector<double> v_vec = GetArrayFromWire( wirelist, mCluster.clusters[1], ch_width,tick_width);
+        std::vector<double> z_vec = GetArrayFromWire( wirelist, mCluster.clusters[2], ch_width,tick_width);
+
+        if( fLogLevel >= 3 ) std::cout<<"  Got all ArrayFromWire: "<<std::endl;
+        std::vector<double> u_vecc = CombineTicks( u_vec, ch_width, nticks );
+        std::vector<double> v_vecc = CombineTicks( v_vec, ch_width, nticks );
+        std::vector<double> z_vecc = CombineTicks( z_vec, ch_width, nticks );
+        if( fLogLevel >= 3 ) std::cout<<"  Combined all ArrayFromWire: "<<std::endl;
+        std::vector<double> u_veccs = ScaleArray( u_vecc, 1, 225 );
+        std::vector<double> v_veccs = ScaleArray( v_vecc, 1, 225 );
+        std::vector<double> z_veccs = ScaleArray( z_vecc, 1, 225 );
+        if( fLogLevel >= 3 ) std::cout<<"  Scaled all ArrayFromWire: "<<std::endl;
+        //Logs
+        if( fLogLevel >= 10 )
+        {
+          std::cout<<"  Print Array Values: "<<std::endl;
+          //int t=0;
+          for( unsigned int i = 0; i<z_vecc.size(); i++ )
+          {
+            //if( i % ch_width == 0 ) std::cout<<std::endl<<"line "<<t++<<": ";
+            if( i % ch_width == 0 ) std::cout<<std::endl<<"[ ";
+            std::cout<<Form("(%d,%d,%d), ",(int)u_veccs[i],(int)v_veccs[i],(int)z_veccs[i]);
+            if( i % ch_width == (unsigned int) (ch_width-1) ) std::cout<<"],";
+            //if (u_vec[i]==0) continue;
+            //auto ct = CalculateCT(i,ch_width,tick_width);
+            //std::cout<<Form("    Pts: (%d, %d, %.2f)", ct.first,ct.second,u_vec[i])<<std::endl;
+          }
+          std::cout<<std::endl<<"  == End Print Array Values: "<<std::endl<<
+                                 Form("  are wires the same? uv, uz, vz: %d,%d,%d",
+                                     (u_vec==v_vec),
+                                     (u_vec==z_vec),
+                                     (v_vec==z_vec) )<<std::endl;
+        }//end Logs
+
+        WriteNumPy( mCluster, wirelist );
+        ++nDumpedClusters;
+      }
+
+    }
+  }//end fMakeCluster
+
+
 }
 
 void wireana::WireAna::beginJob() {
@@ -206,7 +312,7 @@ void wireana::WireAna::beginJob() {
   gROOT->SetBatch(1);
 
   art::ServiceHandle<art::TFileService> tfs;
-  fTree = tfs->make<TTree>("wireana","wireana tree");
+  fTree = tfs->make<TTree>(fTreeName.c_str() ,fTreeName.c_str() );
 
   fTree->Branch("run", &run);
   fTree->Branch("subrun", &subrun);
@@ -215,54 +321,92 @@ void wireana::WireAna::beginJob() {
   DeclareTruthBranches(fTree, truth_data);
 
 
-  //setup npywriter
-  c2numpy_init(&npywriter, fDumpFileName, fDumpMaxRow);
-   
+  //setup histograms
+  fECMin=-1e-8; //settting energy and charge accumulation to start at this value --> ensures true background, i.e 0 energy/0 charge falls into the underflow bin
+  string name1 = Form("TrueEnergyChargeDeposited_%s",fTreeName.c_str() );
+  string name2 = Form("TrueEnergyChargeDepositedInROI_%s",fTreeName.c_str() );
+  name1 = "TrueEnergyChargeDeposited";
+  name2 = "TrueEnergyChargeDepositedInROI";
 
-  c2numpy_addcolumn(&npywriter, "RUN", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "SUBRUN", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "EVENT", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "MC", C2NUMPY_UINT16 );
-  //setup image format
-  c2numpy_addcolumn(&npywriter, "NChannels", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "NTicks", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "RTicks", C2NUMPY_UINT16 );
-  // generator code
-  c2numpy_addcolumn(&npywriter, "GeneratorCode", C2NUMPY_UINT16 );//0 NueScatter, 1 CC, 2 Radiological
-  //check match code
-  c2numpy_addcolumn(&npywriter, "LabelMatchCode", C2NUMPY_UINT16 );//views: 0 did not match, 1 matched
-  c2numpy_addcolumn(&npywriter, "TrkMatchCode", C2NUMPY_UINT16 );//trkid: 0 did not match, 1 matched
-
-  //setup truth information
-  c2numpy_addcolumn(&npywriter, "NPhoton", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "NProton", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "NNeutron", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "NMeson", C2NUMPY_UINT16 );
-  c2numpy_addcolumn(&npywriter, "NNucleus", C2NUMPY_UINT16 );
-
-  c2numpy_addcolumn(&npywriter, "Nu_Px", C2NUMPY_FLOAT );
-  c2numpy_addcolumn(&npywriter, "Nu_Py", C2NUMPY_FLOAT );
-  c2numpy_addcolumn(&npywriter, "Nu_Pz", C2NUMPY_FLOAT );
-  c2numpy_addcolumn(&npywriter, "Part_Px", C2NUMPY_FLOAT );
-  c2numpy_addcolumn(&npywriter, "Part_Py", C2NUMPY_FLOAT );
-  c2numpy_addcolumn(&npywriter, "Part_Pz", C2NUMPY_FLOAT );
-
-
-  //setup index data
-  for( int i = 0; i < image_size; i++ )
+  for( auto selType : selTypes )
   {
-    for( int v = 0; v < 3; v++ )
+    for( auto partType : partTypes )
     {
-      std::string name=Form("%s_%08d", fViewMap[v].c_str(),i);
-      c2numpy_addcolumn(&npywriter, name.c_str(), C2NUMPY_FLOAT);
+      string n1 = "TrueEnergyChargeDeposited"+selType+partType, n2 = "TrueEnergyChargeDepositedInROI"+selType+partType;
+      if( fLogLevel >= 3 )
+      {
+        std::cout<<n1<<", "<<n2<<std::endl;
+      }
+      TH2FMap[ n1 ] = tfs->make<TH2F>( n1.c_str(), "Energy vs Charge; E (MeV); N",100,0,fHistEnergyMax, 100,0,fHistChargeMax );
+      TH2FMap[ n2 ] = tfs->make<TH2F>( n2.c_str(), "Energy vs Charge; E (MeV); N",100,0,fHistEnergyMax, 100,0,fHistChargeMax );
     }
   }
+
+  name1 = Form("TrueEnergyDeposited_%s",fTreeName.c_str() );
+  name2 = Form("TrueEnergyDepositedInROI_%s",fTreeName.c_str() );
+  TrueEnergyDeposited = tfs->make<TH1F>( name1.c_str(), "Energy vs Charge; E (MeV)",100,0,fHistEnergyMax);
+  TrueEnergyDepositedInROI =  tfs->make<TH1F>( name2.c_str(), "Energy vs Charge; E (MeV)",100,0,fHistEnergyMax);
+
+  name1 = Form("TrueChargeDeposited_%s",fTreeName.c_str() );
+  name2 = Form("TrueChargeDepositedInROI_%s",fTreeName.c_str() );
+  TrueChargeDeposited = tfs->make<TH1F>( name1.c_str(), "Charge vs Charge; E (MeV)",100,0,fHistChargeMax);
+  TrueChargeDepositedInROI =  tfs->make<TH1F>( name2.c_str(), "Charge vs Charge; E (MeV)",100,0,fHistChargeMax);
+
+
+  if(fMakeCluster)
+  {
+    //setup npywriter
+    c2numpy_init(&npywriter, fDumpFileName, fDumpMaxRow);
+     
+
+    c2numpy_addcolumn(&npywriter, "RUN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "SUBRUN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "EVENT", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "MC", C2NUMPY_UINT16 );
+    //setup image format
+    c2numpy_addcolumn(&npywriter, "NChannels", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "NTicks", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "RTicks", C2NUMPY_UINT16 );
+    // generator code
+    c2numpy_addcolumn(&npywriter, "GeneratorCode", C2NUMPY_UINT16 );//0 NueScatter, 1 CC, 2 Radiological
+    //check match code
+    c2numpy_addcolumn(&npywriter, "LabelMatchCode", C2NUMPY_UINT16 );//views: 0 did not match, 1 matched
+    c2numpy_addcolumn(&npywriter, "TrkMatchCode", C2NUMPY_UINT16 );//trkid: 0 did not match, 1 matched
+
+    //setup truth information
+    c2numpy_addcolumn(&npywriter, "NPhoton", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "NProton", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "NNeutron", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "NMeson", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "NNucleus", C2NUMPY_UINT16 );
+
+    c2numpy_addcolumn(&npywriter, "Nu_Px", C2NUMPY_FLOAT );
+    c2numpy_addcolumn(&npywriter, "Nu_Py", C2NUMPY_FLOAT );
+    c2numpy_addcolumn(&npywriter, "Nu_Pz", C2NUMPY_FLOAT );
+    c2numpy_addcolumn(&npywriter, "Part_Px", C2NUMPY_FLOAT );
+    c2numpy_addcolumn(&npywriter, "Part_Py", C2NUMPY_FLOAT );
+    c2numpy_addcolumn(&npywriter, "Part_Pz", C2NUMPY_FLOAT );
+
+
+    //setup index data
+    for( int i = 0; i < image_size; i++ )
+    {
+      for( int v = 0; v < 3; v++ )
+      {
+        std::string name=Form("%s_%08d", fViewMap[v].c_str(),i);
+        c2numpy_addcolumn(&npywriter, name.c_str(), C2NUMPY_FLOAT);
+      }
+    }
+  }// end fMakeCluster
+
+
+  //GetTrackInNeutrinoTruth if MC
 
 }
 
 void wireana::WireAna::endJob()
 {
-  c2numpy_close(&npywriter);
+  if(fMakeCluster) c2numpy_close(&npywriter);
 }
 
 
@@ -310,6 +454,15 @@ void wireana::WireAna::DeclareTruthBranches(TTree*t, DataBlock_Truth &blk)
   t->Branch("truth_had_vtx_z",      &blk.truth_had_vtx_z); 
   t->Branch("truth_had_vtx_t",      &blk.truth_had_vtx_t); 
   t->Branch("truth_had_PDG",        &blk.truth_had_PDG); 
+
+  t->Branch("nROIs", &blk.nROIs);
+  t->Branch("roi_has_truth", &blk.roi_has_truth);
+  t->Branch("lead_pdg", &blk.lead_pdg);
+  t->Branch("lead_pdg_total_energy", &blk.lead_pdg_total_energy);
+  t->Branch("lead_pdg_total_charge", &blk.lead_pdg_total_charge);
+  t->Branch("total_energy", &blk.total_energy);
+  t->Branch("total_charge", &blk.total_charge);
+  t->Branch("hit_fraction", &blk.hit_fraction);
 }
 
 void wireana::WireAna::ResetTruthBranches(DataBlock_Truth &blk)
@@ -342,11 +495,37 @@ void wireana::WireAna::ResetTruthBranches(DataBlock_Truth &blk)
   blk.truth_had_vtx_z = DEFAULT_VALUE; 
   blk.truth_had_vtx_t = DEFAULT_VALUE; 
   blk.truth_had_PDG = DEFAULT_VALUE; 
+  blk.nROIs=0;
+  blk.lead_pdg.clear();
+  blk.lead_pdg_total_energy.clear();
+  blk.lead_pdg_total_charge.clear();
+  blk.total_energy.clear();
+  blk.total_charge.clear();
+  blk.hit_fraction.clear();
+
 }
 
 
 void wireana::WireAna::FillTruthBranches(art::Event const& evt, TTree*t, DataBlock_Truth &blk)
 {
+  //FillROI Truth
+  for( auto &pvv : plane_view_roi_map )
+  {
+    for ( auto & vv : pvv.second )
+    {
+      for (auto & roi : vv.second )
+      {
+        ++blk.nROIs;
+        blk.roi_has_truth.push_back( roi.hasTrueSignal );
+        blk.lead_pdg.push_back( roi.true_leading_pdg );
+        blk.lead_pdg_total_energy.push_back( roi.true_leading_energy_deposit );
+        blk.lead_pdg_total_charge.push_back( roi.true_leading_electron_deposit );
+        blk.total_energy.push_back( roi.true_energy_deposit );
+        blk.total_charge.push_back( roi.true_electron_deposit );
+        blk.hit_fraction.push_back( roi.tdc_hit_fraction );
+      }
+    }
+  }
 
 
 }
@@ -441,7 +620,9 @@ wireana::WireAna::BuildPlaneViewROIMap(  std::vector<art::Ptr<recob::Wire>> &wir
     raw::ChannelID_t chan = wire->Channel();
     int planeID = chan/fNChanPerApa;
     recob::Wire::RegionsOfInterest_t signalROI = wire->SignalROI();
-    for ( auto datarange: signalROI.get_ranges() ) {
+    auto dataranges = signalROI.get_ranges();
+    if( fLogLevel>=10 ) std::cout<<"Channel "<<chan<<" has "<<dataranges.size()<<" ranges"<<std::endl;
+    for ( auto datarange: dataranges ) {
       if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): create roi"<<std::endl;
       wireana::roi thisroi( wire, datarange );
       if( fLogLevel>=10 ) std::cout<<"BuildPlaneViewROIMap(): created roi"<<std::endl;
@@ -560,7 +741,7 @@ wireana::WireAna::FillTrackIDtoLabelMap( art::Event const& evt )
 
 
 void 
-wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
+wireana::WireAna::TagAllROIClusterTruth(const detinfo::DetectorClocksData &clock )
 {
   for( auto &pvv : plane_view_roicluster_map )
   {
@@ -568,7 +749,7 @@ wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
     {
       for (auto & cluster : vv.second )
       {
-        TagROITruth( cluster, clock );
+        TagROIClusterTruth( cluster, clock );
       }
     }
   }
@@ -629,9 +810,9 @@ wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
 //! Look at each tick and search for true particle deposit and the
 //! generator tag
 void
-wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::DetectorClocksData &clock )
+wireana::WireAna::TagROIClusterTruth( wireana::roicluster &cluster, const detinfo::DetectorClocksData &clock )
 {
-  if (fLogLevel>=10) std::cout<<"Entering TagROITruth"<<std::endl;
+  if (fLogLevel>=10) std::cout<<"Entering TagROIClusterTruth"<<std::endl;
 
   std::vector< std::pair< int, std::pair<float,float> > > trkID_sum; 
   for ( auto& roi: cluster.ROIs ) // loop 1
@@ -639,7 +820,7 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
     int roi_channel = roi.wire->Channel();
     if (fLogLevel>=10) 
     {
-      std::cout<<"TagROITruth:look at channel "<<roi_channel<<std::endl;
+      std::cout<<"TagROIClusterTruth:look at channel "<<roi_channel<<std::endl;
       std::cout<<"            Map Size: "<<ch_w_sc.size()<<std::endl;
       std::cout<<"            Channel ID Exists? "<< (ch_w_sc.find(roi_channel) != ch_w_sc.end())<<std::endl;
       std::cout<<"            Wire Exist? "<<ch_w_sc[ roi_channel ].first->Channel()<<std::endl;
@@ -659,6 +840,8 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
     //! Get all the IDE (Ionization at a point of the TPC sensitive volume. ) that deposited energy in the datarange_t
     std::vector< sim::IDE >  ide_vec = simchannel->TrackIDsAndEnergies(startTDC, endTDC);
     if (fLogLevel>=10) std::cout<<"           ide_vec size: "<<ide_vec.size()<<std::endl;
+
+    //Fill True Energy Charge Deposited in ROI
 
     if( ide_vec.size() == 0 ) continue;
 
@@ -747,13 +930,212 @@ wireana::WireAna::TagROITruth( wireana::roicluster &cluster, const detinfo::Dete
     int pdg = part1->PdgCode();
     cluster.pdg_energy_list.push_back( std::make_pair( pdg, trkid.second ));
   }
+}
+
+
+
+void 
+wireana::WireAna::TagAllROITruth(const detinfo::DetectorClocksData &clock )
+{
+  for( auto &pvv : plane_view_roi_map )
+  {
+    for ( auto & vv : pvv.second )
+    {
+      for (auto & roi : vv.second )
+      {
+        TagROITruth( roi, clock );
+      }
+    }
+  }
+  if (fLogLevel >= 4 )
+  {
+    std::cout<<"========================================="<<std::endl;
+    std::cout<<"Printing ROI Truth:"<<std::endl;
+    for( auto &pvv : plane_view_roi_map )
+    {
+      for ( auto & vv : pvv.second )
+      {
+        std::cout<<Form("Plane %d, View %d: ", pvv.first,vv.first)<<std::endl;
+        for (auto & roi: vv.second )
+        {
+          std::cout<<"-----------------"<<std::endl;
+          std::cout<<
+            Form("  roi channel: %d, tick range: (%d, %d)",
+              roi.channel, roi.begin_index, roi.end_index)
+            <<std::endl;
+          std::cout<<
+            Form("  has_truth: %d, true_electron_dep: %.2f",
+              roi.hasTrueSignal, roi.true_leading_energy_deposit )
+            <<std::endl;
+        }
+      }
+    }
+  }
 
 }
+
+void
+wireana::WireAna::TagROITruth( wireana::roi &roi, const detinfo::DetectorClocksData &clock )
+{
+  if (fLogLevel>=10) std::cout<<"Entering TagROITruth"<<std::endl;
+
+  std::vector< std::pair< int, std::pair<float,float> > > trkID_sum; 
+  int roi_channel = roi.wire->Channel();
+  if (fLogLevel>=10) 
+  {
+    std::cout<<"TagROITruth:look at channel "<<roi_channel<<std::endl;
+    std::cout<<"            Map Size: "<<ch_w_sc.size()<<std::endl;
+    std::cout<<"            Channel ID Exists? "<< (ch_w_sc.find(roi_channel) != ch_w_sc.end())<<std::endl;
+    std::cout<<"            Wire Exist? "<<ch_w_sc[ roi_channel ].first->Channel()<<std::endl;
+    std::cout<<"            SimChannel Exist? "<<ch_w_sc[ roi_channel ].second->Channel()<<std::endl;
+  }
+  art::Ptr<sim::SimChannel> &simchannel = ch_w_sc[ roi_channel ].second;
+
+  //! Get the TPC time from the ticks in the ROI datarange_t
+  double startTDC = clock.TPCTick2TDC( roi.begin_index );
+  double endTDC   = clock.TPCTick2TDC( roi.end_index );
+  if (fLogLevel>=10) 
+  {
+    std::cout<<"            SimChannel exist? "<<simchannel->Channel()<<std::endl;
+    std::cout<<"            startTDC, endTDC: "<<startTDC<<", "<<endTDC<<std::endl;
+  }
+  //--------------------Tagging Energy/Electron Deposits------------
+  sim::SimChannel::TDC_t totalTDC = sim::SimChannel::TDC_t(endTDC)-sim::SimChannel::TDC_t(startTDC)+1;
+  sim::SimChannel::TDC_t nTDC = 0;
+
+  for( sim::SimChannel::TDC_t i = (sim::SimChannel::TDC_t) startTDC; i <= (sim::SimChannel::TDC_t) endTDC; i++ )
+  {
+    //Fill TrueEnergyChargeDepositedInROI
+    std::vector< sim::IDE >  ides = simchannel->TrackIDsAndEnergies(i,i);
+
+    std::vector<float> energies(partTypes.size(),fECMin );
+    std::vector<float> charges(partTypes.size(),fECMin );
+    std::vector<float> energiesNeut(partTypes.size(),fECMin );
+    std::vector<float> chargesNeut(partTypes.size(),fECMin );
+    std::vector<float> energiesRad(partTypes.size(),fECMin );
+    std::vector<float> chargesRad(partTypes.size(),fECMin );
+
+    for( auto &ide: ides )
+    {
+      bool isSignal = trkid_to_label_map[ ide.trackID ] == "NuEScatter" || trkid_to_label_map[ ide.trackID ] == "marley";
+      int pdg = PIS->TrackIdToParticle_P( ide.trackID )->PdgCode();
+      float energy = ide.energy;
+      float numElectrons = ide.numElectrons;
+      energies[kAll]+=energy;
+      charges[kAll]+=numElectrons;
+      int partType = -1;
+      if( abs(pdg) == 11 || abs(pdg) == 13 || abs(pdg) == 15 )
+      {
+        partType = kElectron;
+      } else if( abs(pdg) == 2212)
+      {
+        partType = kProton;
+      } else if(abs(pdg) == 2112)
+      {
+        partType = kNeutron;
+      } else if(abs(pdg) == 22)
+      {
+        partType = kPhoton;
+      } else
+      {
+        partType = kNuc;
+      }
+      //parsed particle, accumulate energy
+      energies[partType]+=energy; charges[partType]+=numElectrons;
+      if( isSignal )
+      {
+        energiesNeut[partType]+=energy; chargesNeut[partType]+=numElectrons;
+      }
+      else
+      {
+        energiesRad[partType]+=energy; chargesRad[partType]+=numElectrons;
+      }
+    }
+
+    FillHistogram( energies, charges, kSAll, true );
+    FillHistogram( energiesNeut, chargesNeut, kSNeutrino, true );
+    FillHistogram( energiesRad, chargesRad, kSRad, true );
+
+    TrueEnergyDepositedInROI->Fill(energies[0]);
+    TrueChargeDepositedInROI->Fill(charges[0]);
+
+    if (energies[0]>0 || charges[0]>0) 
+    {
+      ++nTDC;
+      roi.true_energy_deposit+= energies[0];
+      roi.true_electron_deposit+= charges[0];
+    }
+  }
+  roi.tdc_hit_fraction = double(nTDC)/double(totalTDC);
+  if(fLogLevel>=10)
+  {
+    std::cout<<Form("startTDC, endTDC: (%f,%f), nTDC: %d, totalTDC: %d",
+        startTDC,endTDC, nTDC, totalTDC )<<std::endl;
+  }
+
+
+  //--------------------Tagging Truth Particles---------------------
+  //! Get all the IDE (Ionization at a point of the TPC sensitive volume. ) that deposited energy in the datarange_t
+  std::vector< sim::IDE >  ide_vec = simchannel->TrackIDsAndEnergies(startTDC, endTDC);
+  if (fLogLevel>=10) std::cout<<"           ide_vec size: "<<ide_vec.size()<<std::endl;
+
+  if( ide_vec.size() == 0 ) return;
+
+  //! This ROI has true signal
+  roi.hasTrueSignal = true;
+
+  //!pair<trkid, pair<numElectrons, energy>> , sum up n electrons and total energy within the ROI for each trkid
+
+  //! fill vector of ide
+  if (fLogLevel>=10) std::cout<<"           fill truth loop: begin"<<std::endl;
+  for( auto ide : ide_vec ) //loop 5
+  {
+    //! check if track has been saved in the trkID_sum vector.
+    auto it = trkID_sum.begin();
+    for( ; it!=trkID_sum.end(); ++it ) {
+      if( it->first == ide.trackID ) break; 
+    }
+
+    if (it == trkID_sum.end()) {
+      //! if not, add the track id and initialize with the IDE data
+      std::pair< int, std::pair<float,float> > data;
+      data.first = ide.trackID;
+      data.second.first =ide.numElectrons;
+      data.second.second = ide.energy;
+      trkID_sum.push_back(data);
+    } else {
+      //! if yes, sum nElectron and energy to the track id.
+      it->second.first+=ide.numElectrons;
+      it->second.second+=ide.energy;
+    }
+  }// end loop 5
+
+  if (fLogLevel>=10) std::cout<<"           fill truth loop: end"<<std::endl;
+
+  //! sort vector of (trkid,(#electron, energy)) by # electrons
+  //! could also sort by energy but #e should be a more direct observable?
+
+
+  if (fLogLevel>=10) std::cout<<"   filled all trkID_sum"<<std::endl;
+  // Once all ROI has been analyzed, sort trkID by #electrons
+  std::sort( trkID_sum.begin(), trkID_sum.end(), [](auto &a, auto &b){ return a.second.first > b.second.first;} );
+  if (fLogLevel>=10) std::cout<<"   trkID_sum sorted"<<std::endl;
+
+  roi.hasTrueSignal =  trkID_sum.size() > 0;
+  if( roi.hasTrueSignal )
+  {
+    roi.true_leading_pdg = PIS->TrackIdToParticle_P( trkID_sum.front().first )->PdgCode();
+    roi.true_leading_electron_deposit = trkID_sum.front().second.first;
+    roi.true_leading_energy_deposit = trkID_sum.front().second.second;
+  }
+}
+
+
 
 std::vector<double>
 wireana::WireAna::GetArrayFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist, wireana::roicluster &cluster, int channel_width, int tick_width )
 {
-  if( fLogLevel >= 3 )
+  if( fLogLevel >= 10 )
   {
     std::cout<<Form("GetArrayFromWire::Log: begin")<<std::endl;
   }
@@ -898,6 +1280,7 @@ wireana::WireAna::CalculateCT( int index, int c_width )
   return std::make_pair( c, t);
 }
 
+
 void
 wireana::WireAna::WriteNumPy( wireana::matchedroicluster& cluster,  std::vector<art::Ptr<recob::Wire>>& wirelist)
 {
@@ -949,5 +1332,20 @@ wireana::WireAna::WriteNumPy( wireana::matchedroicluster& cluster,  std::vector<
     }
   }
 }
+
+//============================ Histogram Functions ================================
+void
+wireana::WireAna::FillHistogram(std::vector<float> energies, std::vector<float>charges ,SType s, bool inROI)
+{
+  string hnamebase = ( (inROI)? "TrueEnergyChargeDepositedInROI" : "TrueEnergyChargeDeposited" )+selTypes[s];
+  for( unsigned int i = 0; i< partTypes.size(); i++ )
+  {
+    string hname = (hnamebase+partTypes[i]);
+    if( fLogLevel >= 10 ) std::cout<<hname<<std::endl;
+    TH2FMap[hname]->Fill(energies[i],charges[i]);
+  }
+}
+
+
 
 DEFINE_ART_MODULE(wireana::WireAna)

@@ -9,6 +9,7 @@ standard_wireana:
   SimulationProducerLabel:      "largeant"
   LogLevel:                     3
   DoAssns:                      false
+  MakeCluster:                  true
   ChannelPerApa:                2560
   TickesPerWire:                6000
   DBSCAN_Eps:                   4.5
@@ -19,6 +20,10 @@ standard_wireana:
   IMAGE_REBIN_TICK:             4
   DUMPMAXROW:                   50000
   DUMPFILENAME:                 "data"
+  DUMPNCLUSTERS:                -1
+  TREENAME:                     "wireana"
+  Histo_EMax:                   10
+  Histo_CMax:                   10000
 }
 
 END_PROLOG
