@@ -12,7 +12,6 @@
 
 //LArSoft includes
 #include "larcore/Geometry/Geometry.h"
-#include "larcore/CoreUtils/ServiceUtil.h"
 
 #include "larcorealg/Geometry/LocalTransformationGeo.h"
 #include "larcorealg/Geometry/WireGeo.h"

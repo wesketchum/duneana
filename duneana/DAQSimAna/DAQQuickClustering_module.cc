@@ -1,5 +1,4 @@
 #include "DAQQuickClustering_module.h"
-#include "larcore/CoreUtils/ServiceUtil.h"
 
 void ClusterHitsInTime::DoIt(std::vector<recoHit> cHitVector)
 {

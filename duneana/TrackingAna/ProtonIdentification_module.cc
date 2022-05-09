@@ -29,7 +29,6 @@
 
 // LArSoft includes
 #include "larcore/Geometry/Geometry.h"
-#include "larcore/CoreUtils/ServiceUtil.h"
 #include "larcorealg/Geometry/CryostatGeo.h"
 #include "larcorealg/Geometry/TPCGeo.h"
 #include "larcorealg/Geometry/PlaneGeo.h"

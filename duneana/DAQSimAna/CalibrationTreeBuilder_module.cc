@@ -11,7 +11,6 @@
 #include "CalibrationTreeBuilder.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
-#include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include <vector>
 #include <TObject.h>
 

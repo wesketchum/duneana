@@ -24,7 +24,6 @@
 
 // LArSoft includes
 #include "larcore/Geometry/Geometry.h"
-#include "larcore/CoreUtils/ServiceUtil.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 #include "larsim/MCCheater/ParticleInventoryService.h"
 
