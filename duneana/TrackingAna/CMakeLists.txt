@@ -1,13 +1,13 @@
 art_make(BASENAME_ONLY
 	 MODULE_LIBRARIES
-         lardataalg_DetectorInfo
-	 lardataobj_RawData
-	 lardataobj_RecoBase
-	 larcorealg_Geometry
-	 larcore_Geometry_Geometry_service
-	 lardata_Utilities
-	 larsim_MCCheater_BackTrackerService_service
-	 larsim_MCCheater_ParticleInventoryService_service
+         lardataalg::DetectorInfo
+	 lardataobj::RawData
+	 lardataobj::RecoBase
+	 larcorealg::Geometry
+	 larcore::Geometry_Geometry_service
+	 lardata::Utilities
+	 larsim::MCCheater_BackTrackerService_service
+	 larsim::MCCheater_ParticleInventoryService_service
 	 nusimdata::SimulationBase
 	 ART_FRAMEWORK_CORE
 	 ART_FRAMEWORK_PRINCIPAL

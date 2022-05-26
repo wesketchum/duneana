@@ -1,8 +1,8 @@
 
 cet_build_plugin(dunezsanalysis art::module
-  larcore_Geometry_Geometry_service
-  larcorealg_Geometry
-  lardataobj_RawData
+  larcore::Geometry_Geometry_service
+  larcorealg::Geometry
+  lardataobj::RawData
   nusimdata::SimulationBase
   ART_FRAMEWORK_CORE
   ART_FRAMEWORK_PRINCIPAL
@@ -14,19 +14,20 @@ cet_build_plugin(dunezsanalysis art::module
   art::Persistency_Provenance canvas
   art::Utilities canvas
   messagefacility::MF_MessageLogger
-  
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
   BASENAME_ONLY
   )
 
 cet_build_plugin(dEdx art::module
-  larcore_Geometry_Geometry_service
-  larcorealg_Geometry
-  lardataobj_RawData
-  lardataobj_RecoBase
-  lardata_Utilities
-  larsim_Simulation nug4::ParticleNavigation lardataobj_Simulation
+  larcore::Geometry_Geometry_service
+  larcorealg::Geometry
+  lardataobj::RawData
+  lardataobj::RecoBase
+  lardata::Utilities
+  larsim::Simulation 
+  nug4::ParticleNavigation 
+  lardataobj::Simulation
   nusimdata::SimulationBase
   ART_FRAMEWORK_CORE
   ART_FRAMEWORK_PRINCIPAL
@@ -38,22 +39,23 @@ cet_build_plugin(dEdx art::module
   art::Persistency_Provenance canvas
   art::Utilities canvas
   messagefacility::MF_MessageLogger
-  
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
   BASENAME_ONLY
   )
 
 cet_build_plugin(EMEnergyCalib art::module
-  lardataalg_DetectorInfo
-  lardataobj_RawData
-  lardataobj_RecoBase
-  larcorealg_Geometry
-  larcore_Geometry_Geometry_service
-  larsim_MCCheater_BackTrackerService_service
-  larsim_MCCheater_ParticleInventoryService_service
-  larsim_Simulation nug4::ParticleNavigation lardataobj_Simulation
-  lardata_Utilities
+  lardataalg::DetectorInfo
+  lardataobj::RawData
+  lardataobj::RecoBase
+  larcorealg::Geometry
+  larcore::Geometry_Geometry_service
+  larsim::MCCheater_BackTrackerService_service
+  larsim::MCCheater_ParticleInventoryService_service
+  larsim::Simulation 
+  nug4::ParticleNavigation 
+  lardataobj::Simulation
+  lardata::Utilities
   nusimdata::SimulationBase
   ART_FRAMEWORK_CORE
   ART_FRAMEWORK_PRINCIPAL
@@ -65,21 +67,20 @@ cet_build_plugin(EMEnergyCalib art::module
   art::Persistency_Provenance canvas
   art::Utilities canvas
   messagefacility::MF_MessageLogger
-  
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
   BASENAME_ONLY
   )
 
 cet_build_plugin(EMPi0Energy art::module
-  lardataobj_RawData
-  lardataobj_RecoBase
-  larcorealg_Geometry
-  larcore_Geometry_Geometry_service
-  larsim_MCCheater_BackTrackerService_service
-  larsim_MCCheater_ParticleInventoryService_service
-  larsim_Simulation nug4::ParticleNavigation lardataobj_Simulation
-  lardata_Utilities
+  lardataobj::RawData
+  lardataobj::RecoBase
+  larcorealg::Geometry
+  larcore::Geometry_Geometry_service
+  larsim::MCCheater_BackTrackerService_service
+  larsim::MCCheater_ParticleInventoryService_service
+  larsim::Simulation nug4::ParticleNavigation lardataobj_Simulation
+  lardata::Utilities
   nusimdata::SimulationBase
   ART_FRAMEWORK_CORE
   ART_FRAMEWORK_PRINCIPAL
@@ -91,7 +92,6 @@ cet_build_plugin(EMPi0Energy art::module
   art::Persistency_Provenance canvas
   art::Utilities canvas
   messagefacility::MF_MessageLogger
-  
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
   BASENAME_ONLY

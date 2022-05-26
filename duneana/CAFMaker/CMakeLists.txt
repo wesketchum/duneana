@@ -67,10 +67,10 @@ cet_build_plugin(CAFMaker   art::module
 			GPHMEL
 			GPHNDCY
 			GFWMSG
-                        systematicstools_interface
-			systematicstools_interpreters
-			systematicstools_utility
-                        dunereco_CVN_func
+                        systematicstools::interface
+			systematicstools::interpreters
+			systematicstools::utility
+                        dunereco::CVN_func
               BASENAME_ONLY
 )
 

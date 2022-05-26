@@ -1,14 +1,15 @@
 art_make( BASENAME_ONLY MODULE_LIBRARIES
-  lardataalg_DetectorInfo
-  larcore_Geometry_Geometry_service
-  larcorealg_Geometry
-  lardataobj_RawData
-  larsim_MCCheater_BackTrackerService_service
-  larsim_MCCheater_PhotonBackTrackerService_service
-  larsim_MCCheater_ParticleInventoryService_service
-  larsim_Simulation
+  lardataalg::DetectorInfo
+  larcore::Geometry_Geometry_service
+  larcorealg::Geometry
+  lardataobj::RawData
+  lardata::DetectorPropertiesService
+  larsim::MCCheater_BackTrackerService_service
+  larsim::MCCheater_PhotonBackTrackerService_service
+  larsim::MCCheater_ParticleInventoryService_service
+  larsim::Simulation
   nug4::ParticleNavigation
-  lardataobj_Simulation
+  lardataobj::Simulation
   nusimdata::SimulationBase	
   ART_FRAMEWORK_CORE
   ART_FRAMEWORK_PRINCIPAL
