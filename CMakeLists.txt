@@ -38,6 +38,7 @@ find_ups_product( larsim )
 find_ups_product( larevt )
 find_ups_product( larpandora )
 find_ups_product( systematicstools )
+#find_ups_product( dunepdlegacy )
 find_ups_geant4( )
 
 # macros for artdaq_dictionary and simple_plugin
