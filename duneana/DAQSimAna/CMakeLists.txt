@@ -6,7 +6,7 @@ add_subdirectory(absRunningSumHitFinder)
 make_dune_tool_builder(dunecore::TriggerPrimitiveFinderTool)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
-  dune_raw_data::dune-raw-data_Services_ChannelMap_PdspChannelMapService_service
+  dunepdlegacy_Services_ChannelMap_PdspChannelMapService_service
   larcore::Geometry_Geometry_service
   lardataalg::DetectorInfo
   larcorealg::Geometry
