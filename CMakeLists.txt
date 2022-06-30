@@ -38,6 +38,7 @@ find_ups_product( larsim )
 find_ups_product( larevt )
 find_ups_product( larpandora )
 find_ups_product( systematicstools )
+find_package(GENIE REQUIRED EXPORT)
 #find_ups_product( dunepdlegacy )
 find_ups_geant4( )
 
