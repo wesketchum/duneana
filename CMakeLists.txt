@@ -8,7 +8,7 @@ cmake_minimum_required (VERSION 3.19 FATAL_ERROR)
 
 #project(duneana VERSION 09.48.00.d00 LANGUAGES CXX)
 project(duneana LANGUAGES CXX)
-set(${PROJECT_NAME}_CMAKE_PROJECT_VERSION_STRING 09.53.02d00)
+set(${PROJECT_NAME}_CMAKE_PROJECT_VERSION_STRING 09.54.00d00)
 
 # cetbuildtools contains our cmake modules
 find_package(cetbuildtools REQUIRED)
@@ -38,6 +38,7 @@ find_ups_product( larsim )
 find_ups_product( larevt )
 find_ups_product( larpandora )
 find_ups_product( systematicstools )
+find_package(GENIE REQUIRED EXPORT)
 #find_ups_product( dunepdlegacy )
 find_ups_geant4( )
 
