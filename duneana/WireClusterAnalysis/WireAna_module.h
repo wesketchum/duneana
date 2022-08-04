@@ -45,6 +45,13 @@
 #include "art_root_io/TFileService.h"
 
 #include "c2numpy.h"
+#include "hep_hpc/hdf5/File.hpp"
+#include "hep_hpc/hdf5/Column.hpp"
+#include "hep_hpc/hdf5/Ntuple.hpp"
+#include "hep_hpc/hdf5/errorHandling.hpp"
+#include "hep_hpc/hdf5/make_column.hpp"
+#include "hep_hpc/hdf5/make_ntuple.hpp"
+
 
 // ROOT includes
 #include "TTree.h"
@@ -62,7 +69,27 @@
 namespace wireana {
 
   //using recob::SpacePoint;
-
+  using namespace hep_hpc::hdf5;
+  using wire_nt_t = Ntuple<float>;
+  using evt_nt_t = Ntuple<unsigned int, double>;
+  using imager_t = Ntuple<
+    int, //event id , 5,run,subrun,event, isMC,clusterID  
+    float, //neutrino P, 4
+    float, //int vtx, 4
+    float, //part P, 4
+    std::string,  //label, scalar
+    int, //nPart, scalar
+    int, //tpcid
+    int, //view
+    int, //pdg ,5 sorted by energy
+    int, //trkid ,5 sorted by energy
+    float, //charge, 5
+    float, //energy, 5
+    int, //n: e,gamma, p,n, meson, alpha, 6
+    short, //image data (width,height,min_channel,min_time),4
+    Column<double,2>, //image 
+    Column<short,2>, //image pdg mask 
+    Column<short,2> > ; //image pid mask 
 
 
   struct DataBlock_Truth
@@ -123,6 +150,7 @@ public:
   WireAna(WireAna&&) = delete;
   WireAna& operator=(WireAna const&) = delete;
   WireAna& operator=(WireAna&&) = delete;
+  virtual ~WireAna() noexcept {};
 
   /////////////////////////////////////////////
   // Required functions.
@@ -137,11 +165,12 @@ public:
   void reset();
 
 private:
+  
   /////////////////////////////////////////////
   // Geometry Options && Tool options
   int fNPlanes;
   int fNChanPerApa;
-  int fNTicksPerWire;
+  unsigned int fNTicksPerWire;
   int fChannelDistance;
   int fTickDistance;
   int fMinClusterSize;
@@ -153,22 +182,29 @@ private:
 
   float fDeltaMetric;
 
-  int image_channel_width;
-  int image_tick_width;
-  int image_rebin_tick;
-  int image_size;
+  unsigned int image_channel_width;
+  unsigned int image_tick_width;
+  unsigned int image_rebin_tick;
+  unsigned int image_size;
 
   float fHistEnergyMax;
   float fHistChargeMax;
 
   /////////////////////////////////////////////
   // Backtracker services
+  art::ServiceHandle<cheat::ParticleInventoryService> PIS;
+ 
+  /////////////////////////////////////////////
+  // Geometry services
+  const geo::GeometryCore* geo; //= lar::providerFrom<geo::Geometry>();
 
   /////////////////////////////////////////////
   // config
   int fLogLevel;
   bool fDoAssns;
   bool fMakeCluster;
+
+
 
   /////////////////////////////////////////////
   // Wire Filtering/Clustering Functions
@@ -241,6 +277,7 @@ private:
   const art::InputTag fSimulationProducerLabel;
 
   std::string fDumpFileName;
+  std::string fHDF5DumpFileName;
   int fDumpMaxRow;
   int fDumpNClusters;
 
@@ -269,7 +306,6 @@ private:
   void TagROIClusterTruth( wireana::roicluster &cluster, const detinfo::DetectorClocksData &clock );
   void TagAllROITruth( const detinfo::DetectorClocksData &clock );
   void TagROITruth( wireana::roi &roi, const detinfo::DetectorClocksData &clock );
-  art::ServiceHandle<cheat::ParticleInventoryService> PIS;
 
   ////////////////////////////////////////////
   // Internal Data Structure
@@ -286,11 +322,30 @@ private:
   std::vector<double> CombineTicks( const std::vector<double> &input, int channel_width, int nticks);
   std::vector<double> ScaleArray( const std::vector<double> &input, double min, double max );
   int CalculateIndex( int c, int t, int c_width, int t_width );
+
+  std::pair<std::vector<short>,std::vector<short>>
+  GetMaskFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist, wireana::roicluster &cluster, int channel_width, int new_tickwidth );
+
   std::pair<int,int> CalculateCT( int index, int c_width );
 
   std::map<int, std::string> fViewMap;
 
   c2numpy_writer npywriter;
+
+  /////////////////////////////////////////////
+  // HDF5 Create
+  void CreateHDF5DataSet( art::Event const & evt, wireana::roicluster& cluster,  std::vector<art::Ptr<recob::Wire>>& wirelist, std::vector<art::Ptr<sim::SimChannel>>& chlist) ;
+
+  File hdffile;
+  imager_t *image_tuple;
+  //imager_t image_tuple;
+
+  //unsigned int -- event id,4
+  //string --> generator label
+
+  int fApaNColums;
+  int fApaNRows;
+
 
 };
 

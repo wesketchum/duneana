@@ -11,9 +11,10 @@ wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
   fLogLevel           = pset.get<int>("LogLevel", 10);
   fDoAssns            = pset.get<bool>("DoAssns", false);
   fNChanPerApa        = pset.get<int>("ChannelPerApa", 2560);
-  fNTicksPerWire      = pset.get<int>("TickesPerWire", 6000);
+  fNTicksPerWire      = pset.get<unsigned int>("TickesPerWire", 6000);
   fMakeCluster        = pset.get<bool>("MakeCluster", true );
-  auto const* geo = lar::providerFrom<geo::Geometry>();
+  //auto const* geo = lar::providerFrom<geo::Geometry>();
+  geo = lar::providerFrom<geo::Geometry>();
   fNPlanes = geo->Nplanes();
 
   fMinPts  =  pset.get<unsigned int>("DBSCAN_MinPts", 2);
@@ -23,14 +24,16 @@ wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
 
   fDeltaMetric = pset.get<float>("CleanClusterDeltaScore", 0.01);
 
-  image_channel_width  = pset.get<int>("IMAGE_CHANNEL_WIDTH",13); 
-  image_tick_width     = pset.get<int>("IMAGE_TICK_WIDTH",400); 
-  image_rebin_tick     = pset.get<int>("IMAGE_REBIN_TICK",4); 
+  image_channel_width  = pset.get<unsigned int>("IMAGE_CHANNEL_WIDTH",13); 
+  image_tick_width     = pset.get<unsigned int>("IMAGE_TICK_WIDTH",400); 
+  image_rebin_tick     = pset.get<unsigned int>("IMAGE_REBIN_TICK",4); 
   image_size           = image_channel_width*image_tick_width/image_rebin_tick;
 
   fDumpFileName      = pset.get<std::string>("DUMPFILENAME", "out.npy");
   fDumpMaxRow        = pset.get<int>("DUMPMAXROW", 50000);
   fDumpNClusters     = pset.get<int>("DUMPNCLUSTERS",-1);
+
+  fHDF5DumpFileName      = pset.get<std::string>("HDF5NAME", "hdf5out.h5");
 
 
   fHistEnergyMax         = pset.get<float>("Histo_EMax", 10);
@@ -49,11 +52,14 @@ wireana::WireAna::WireAna(fhicl::ParameterSet const& pset)
     std::cout<<"Histogram Selection Types: "<<std::endl;
     for( auto st: selTypes ) std::cout<<selTypes.size()<<std::endl;
   }
+
 }
 
 void wireana::WireAna::analyze(art::Event const & evt) {
   //reset containers
   reset();
+
+
   //get detector property
   auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
   auto const detProp = art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
@@ -63,6 +69,7 @@ void wireana::WireAna::analyze(art::Event const & evt) {
   subrun = evt.subRun();
   event = evt.id().event();
   std::cout<<"########## EvtNo."<<event<<std::endl;
+  std::cout<<"Let's TRY!"<<std::endl;
 
   MC = !evt.isRealData();
   /// FillTruthInfo to internal data objects
@@ -301,8 +308,30 @@ void wireana::WireAna::analyze(art::Event const & evt) {
         ++nDumpedClusters;
       }
 
+      std::vector<matchedroicluster> mclusters = matcher.GetMatchedClusters();
+      //CreateHDF5DataSet( evt, mclusters[0].clusters[0], wirelist, channellist );
+
     }
+
+
+    for( auto p: plane_view_roicluster_map )
+    {
+      for( auto v: p.second )
+      {
+        auto clusters = v.second;
+        std::sort(clusters.begin(), clusters.end(), [](auto &a, auto &b){ return a.ROIs.size() > b.ROIs.size(); } );
+        for( auto cluster: clusters )
+        {
+          if( cluster.nWires > 2 && cluster.clusterID>=0 ) 
+          {
+            CreateHDF5DataSet( evt, cluster, wirelist, channellist );
+          }
+        }
+      }
+    }
+
   }//end fMakeCluster
+
 
 
 }
@@ -372,6 +401,13 @@ void wireana::WireAna::beginJob() {
     //check match code
     c2numpy_addcolumn(&npywriter, "LabelMatchCode", C2NUMPY_UINT16 );//views: 0 did not match, 1 matched
     c2numpy_addcolumn(&npywriter, "TrkMatchCode", C2NUMPY_UINT16 );//trkid: 0 did not match, 1 matched
+    //cluster positions
+    c2numpy_addcolumn(&npywriter, "U_Ch_MIN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "U_T_MIN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "V_Ch_MIN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "V_T_MIN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "Z_Ch_MIN", C2NUMPY_UINT16 );
+    c2numpy_addcolumn(&npywriter, "Z_T_MIN", C2NUMPY_UINT16 );
 
     //setup truth information
     c2numpy_addcolumn(&npywriter, "NPhoton", C2NUMPY_UINT16 );
@@ -389,15 +425,79 @@ void wireana::WireAna::beginJob() {
 
 
     //setup index data
-    for( int i = 0; i < image_size; i++ )
+    for( unsigned int i = 0; i < image_size; i++ )
     {
-      for( int v = 0; v < 3; v++ )
+      for( unsigned int v = 0; v < 3; v++ )
       {
         std::string name=Form("%s_%08d", fViewMap[v].c_str(),i);
         c2numpy_addcolumn(&npywriter, name.c_str(), C2NUMPY_FLOAT);
       }
     }
   }// end fMakeCluster
+
+  //HDF5
+  //
+  //unsigned int nIndWires = fApaNRows*fApaNColums*800;
+  //unsigned int nColWires = fApaNRows*fApaNColums*960;
+  hdffile = hep_hpc::hdf5::File(fHDF5DumpFileName, H5F_ACC_TRUNC);
+  std::cout<<"hdffile created"<<std::endl;
+  image_tuple = new imager_t(hdffile, "images",
+      {{"event_id",5}, 
+      {"neutrino_P",4},  
+      {"int_vtx",4},  
+      {"part_P",4},  
+      "label",
+      "nPart",
+      "TPCID",
+      "View",
+      {"pdg",5},
+      {"trkid",5},
+      {"charge",5},
+      {"energy",5},
+      {"particle_counter",7},
+      {"img_data",4}, //image data (width,height,min_channel,min_time)
+      {"img", {image_tick_width, image_channel_width}},
+      {"img_mask_pdg", {image_tick_width, image_channel_width}},
+      {"img_mask_trkid", {image_tick_width, image_channel_width}}
+      } 
+      );
+
+  //auto hdfImages = 
+  //  make_ntuple({hdffile,Form("images_%d_%d_%d",run,subrun,id)}, 
+
+      //hep_hpc::hdf5::make_column<short,2>("U", {nIndWires, fNTicksPerWire},
+      //  {nIndWires*sizeof(short),fNTicksPerWire/100}
+      //  ) 
+      //);
+      //hep_hpc::hdf5::make_column<unsigned short,2>("U_mask", {nIndWires, fNTicksPerWire}) );
+      //hep_hpc::hdf5::make_column<float,2>("V", {nIndWires, fNTicksPerWire}),
+      //hep_hpc::hdf5::make_column<unsigned short,2>("V_mask", {nIndWires, fNTicksPerWire}),
+      //hep_hpc::hdf5::make_column<float,2>("Z", {nColWires, fNTicksPerWire}),
+      //hep_hpc::hdf5::make_column<unsigned short,2>("Z_mask", {nColWires, fNTicksPerWire})
+  //    );
+  //auto hdfImages = hep_hpc::hdf5::make_ntuple({hdffile,"images"}, 
+  //    hep_hpc::hdf5::make_scalar_column<short>("channelID",image_channel_width),
+  //    hep_hpc::hdf5::make_scalar_column<short>("EventID",3),
+  //    hep_hpc::hdf5::make_scalar_column<float>("electron_P",4),
+  //    hep_hpc::hdf5::make_scalar_column<float>("photon_P",4),
+  //    hep_hpc::hdf5::make_scalar_column<float>("proton_P",4),
+  //    hep_hpc::hdf5::make_scalar_column<float>("neutron_P",4),
+  //    hep_hpc::hdf5::make_scalar_column<float>("other_P",4),
+  //    hep_hpc::hdf5::make_scalar_column<short>("nElectrons"),
+  //    hep_hpc::hdf5::make_scalar_column<short>("nPhoton"),
+  //    hep_hpc::hdf5::make_scalar_column<short>("nProton"),
+  //    hep_hpc::hdf5::make_scalar_column<short>("nNeutron"),
+  //    hep_hpc::hdf5::make_scalar_column<short>("nAlpha"),
+  //    hep_hpc::hdf5::make_scalar_column<short>("nOther"),
+  //    hep_hpc::hdf5::make_scalar_column<std::string>("plane"),
+  //    hep_hpc::hdf5::make_scalar_column<std::string>("type"),
+  //    hep_hpc::hdf5::make_scalar_column<short>("ticks",image_tick_width),
+  //    hep_hpc::hdf5::make_column<float,2>("image",{image_channel_width, image_tick_width}),
+  //    hep_hpc::hdf5::make_column<int,2>("image_pdg_mask",{image_channel_width, image_tick_width}),
+  //    hep_hpc::hdf5::make_column<short,2>("image_pid_mask",{image_channel_width, image_tick_width}),
+  //    hep_hpc::hdf5::make_scalar_column<short>("center_channel_tick",2)
+  //    );
+
 
 
   //GetTrackInNeutrinoTruth if MC
@@ -406,7 +506,11 @@ void wireana::WireAna::beginJob() {
 
 void wireana::WireAna::endJob()
 {
-  if(fMakeCluster) c2numpy_close(&npywriter);
+  if(fMakeCluster) 
+  {
+    c2numpy_close(&npywriter);
+    delete image_tuple;
+  }
 }
 
 
@@ -904,6 +1008,8 @@ wireana::WireAna::TagROIClusterTruth( wireana::roicluster &cluster, const detinf
   int trkid = trkID_sum.front().first;
   const simb::MCParticle * part = PIS->TrackIdToMotherParticle_P(trkid);
   art::Ptr<simb::MCTruth> truth = PIS->TrackIdToMCTruth_P(trkid);
+  //set cluster int_vtx
+  cluster.int_vtx = part->Position();
 
   if ( truth->NeutrinoSet() )
   {
@@ -1299,6 +1405,14 @@ wireana::WireAna::WriteNumPy( wireana::matchedroicluster& cluster,  std::vector<
   c2numpy_uint16(&npywriter, (unsigned int) cluster.labelmatch() );
   c2numpy_uint16(&npywriter, (unsigned int) cluster.trkmatch());
 
+
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].channel_min );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].begin_index );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[1].channel_min );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[1].begin_index );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[2].channel_min );
+  c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[2].begin_index );
+
   c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_photon );
   c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_proton );
   c2numpy_uint16(&npywriter, (unsigned int) cluster.clusters[0].n_neutron);
@@ -1323,9 +1437,9 @@ wireana::WireAna::WriteNumPy( wireana::matchedroicluster& cluster,  std::vector<
   std::vector< std::shared_ptr<std::vector<double>> > vecc({ u_vecc,
                                                              v_vecc,
                                                              z_vecc } ); 
-  for( int i = 0; i < image_size; i++ )
+  for( unsigned int i = 0; i < image_size; i++ )
   {
-    for( int v = 0; v < 3; v++ )
+    for( unsigned int v = 0; v < 3; v++ )
     {
       std::string name=Form("%s_%08d", fViewMap[v].c_str(),i);
       c2numpy_float(&npywriter, vecc[v]->at(i) );
@@ -1347,5 +1461,166 @@ wireana::WireAna::FillHistogram(std::vector<float> energies, std::vector<float>c
 }
 
 
+std::pair<std::vector<short>,std::vector<short>>
+wireana::WireAna::GetMaskFromWire( std::vector<art::Ptr<recob::Wire>> &wirelist, wireana::roicluster &cluster, int channel_width, int tick_width )
+{
+  if( fLogLevel >= 10 )
+  {
+    std::cout<<Form("GetMaskFromWire::Log: begin")<<std::endl;
+  }
+ 
+  double centroid_channel = cluster.abs_centroidChannel, centroid_tick = cluster.abs_centroidIndex;
+  int c0,t0;
+  c0= centroid_channel - channel_width/2. + 1;
+  t0= centroid_tick - tick_width/2.;
+  std::vector<short> trkid( channel_width*tick_width, 0 );
+  std::vector<short> pdg( channel_width*tick_width, 0 );
+  if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("GetMaskFromWire::Log:  c(c,t):(%.2f, %.2f). (c0,t0):(%d,%d). cpos(%d,%d) ",centroid_channel, centroid_tick, c0, t0, int(centroid_channel-c0), int(centroid_tick-t0))<<std::endl;
+  }
+  auto ptr1 = wirelist.begin();
+  while ( (int) (*ptr1)->Channel() < c0 ) ++ptr1; //increment ptr1 until it reaches the first channel within range
+  auto ptr_end = ptr1;
+  while ((int)  (*ptr_end)->Channel() < c0+channel_width ) 
+  {
+    ++ptr_end; //increment ptr_end until it reaches the first channel outside range
+    if( ptr_end == wirelist.end() ) break;
+  }
+  if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("                        Print ptr:")<<std::endl;
+    std::cout<<Form("                        (ch_begin,ch_end): (%d, %d)",(*ptr1)->Channel(),(*(ptr_end-1))->Channel() )<<std::endl;
+  }
+
+
+  //increment ptr_end until it reaches the first channel outside the range. 
+  //i.e. cfirst, clast = 1,5 --> width = 5
+  //1+5 = 6 is the first channel outside the range
+  //so ptr_end will end when channel >= 6 
+  //
+
+  for ( auto ptr = ptr1; ptr != ptr_end; ++ptr )
+  {
+    int channel = (*ptr)->Channel();
+    int dC = channel - c0;
+    if( dC>=channel_width) break;
+    auto ch = ch_w_sc[channel].second;
+    for ( auto tdcide : ch->TDCIDEMap() )
+    {
+      short tdc = tdcide.first;
+      int i = tdc -t0;
+      if ( i>=0 && i < tick_width )
+      {
+        int index = dC+i*channel_width;
+        int trackID = tdcide.second[0].trackID;
+        int trackID_pdg = PIS->TrackIdToParticle_P( trackID )->PdgCode();
+        trkid[index] = trackID;
+        pdg[index] = trackID_pdg;
+      }
+    }
+  }
+   if( fLogLevel >= 3 )
+  {
+    std::cout<<Form("GetMaskFromWire::Log: processed")<<std::endl;
+  }
+ 
+  return {trkid,pdg};
+  
+}
+
+void 
+wireana::WireAna::CreateHDF5DataSet( art::Event const & evt, wireana::roicluster& cluster,  std::vector<art::Ptr<recob::Wire>>& wirelist, std::vector<art::Ptr<sim::SimChannel>>& chlist)
+{
+  int run= evt.run(); 
+  int subrun = evt.subRun(); 
+  int id = evt.id().event();
+  int isMC = !evt.isRealData();
+
+  std::vector<int> eventid={ run, subrun, id, isMC, cluster.clusterID };
+
+  std::vector<float> neutrino_P={ (float) cluster.momentum_neutrino.Px(),
+                       (float) cluster.momentum_neutrino.Py(),
+                       (float) cluster.momentum_neutrino.Pz(),
+                       (float) cluster.momentum_neutrino.E() };
+  //Find Interaction Vtx of the primary particle
+  std::vector<float> int_vtx = {
+    (float) cluster.int_vtx.X(),
+    (float) cluster.int_vtx.Y(),
+    (float) cluster.int_vtx.Z(),
+    (float) cluster.int_vtx.T() }; 
+  std::vector<float> part_P={ (float) cluster.momentum_part.Px(),
+                   (float) cluster.momentum_part.Py(),
+                   (float) cluster.momentum_part.Pz(),
+                   (float) cluster.momentum_part.E() };
+  std::string label = cluster.label;
+  int maxPart = 5;
+  int nPart = cluster.pdg_energy_list.size();
+  std::vector<int> pdg(maxPart,-9999), trkid(maxPart,-9999);
+  std::vector<float> energy(maxPart,-9999), charge(maxPart,-9999);
+  for( int i = 0; i < nPart && i < maxPart; i++ )
+  {
+    pdg[i] = cluster.pdg_energy_list[i].first;
+    trkid[i] = cluster.trkID_sum[i].first;
+    charge[i]= cluster.trkID_sum[i].second.first;
+    energy[i]= cluster.trkID_sum[i].second.second;
+  }
+
+
+  short c0= cluster.abs_centroidChannel - image_channel_width/2. + 1;
+  short t0= cluster.abs_centroidIndex - image_tick_width/2.;
+
+  geo::Point_t intPoint(int_vtx[0],int_vtx[1], int_vtx[2]);
+  auto TPCID = geo->PositionToTPCID(intPoint);
+  int tpcid = TPCID.TPC;
+  int view = cluster.view;
+  std::vector<short> img_data={
+    (short) image_channel_width, 
+    (short) image_tick_width,
+    c0,
+    t0,
+  };
+
+  std::vector<int> particle_counter={
+    cluster.n_nu,
+    cluster.n_lepton,
+    cluster.n_photon,
+    cluster.n_proton,
+    cluster.n_neutron,
+    cluster.n_meson,
+    cluster.n_nucleus
+  };
+
+  std::vector<double> img = GetArrayFromWire( wirelist, cluster, image_channel_width, image_tick_width );
+  //for ( auto v: GetArrayFromWire( wirelist, cluster, image_channel_width, image_tick_width ) ) img.push_back(v);
+  auto masks = GetMaskFromWire( wirelist, cluster, image_channel_width, image_tick_width );
+  std::vector<short> mask_trkid = masks.first, mask_pdg=masks.second;
+
+  image_tuple->insert(
+      &eventid[0],
+      &neutrino_P[0], 
+      &int_vtx[0], 
+      &part_P[0], 
+      label, 
+      nPart,
+      tpcid,
+      view,
+      &pdg[0],
+      &trkid[0],
+      &charge[0],
+      &energy[0],
+      &particle_counter[0],
+      &img_data[0],
+      &img[0],
+      &mask_pdg[0],
+      &mask_trkid[0]);
+
+  std::cout<<Form("CreateHDF5DataSet: %d %d %d",run,subrun,id)<<std::endl;
+  std::cout<<Form("         position: %f %f %f",int_vtx[0],int_vtx[0],int_vtx[0])<<std::endl;
+  std::cout<<Form("        generator: %s",label.c_str())<<std::endl;
+  std::cout<<Form("      maxwaveform: %f",*std::max_element(img.begin(),img.end()) )<<std::endl;
+  std::cout<<Form("            nROIs: %d",(int) cluster.ROIs.size() )<<std::endl;
+
+}
 
 DEFINE_ART_MODULE(wireana::WireAna)
