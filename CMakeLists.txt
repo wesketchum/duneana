@@ -40,22 +40,7 @@ find_ups_product( larpandora )
 find_ups_product( systematicstools )
 find_package(GENIE REQUIRED EXPORT)
 #find_ups_product( dunepdlegacy )
-
-find_ups_product( clhep )
-find_ups_product( hdf5 )
-find_ups_product( hep_hpc )
 find_ups_geant4( )
-
-
-if(DEFINED ENV{HDF5_DIR} )
-  string(TOUPPER ${CMAKE_BUILD_TYPE} BTYPE_UC )
-  if( ${BTYPE_UC} MATCHES "DEBUG" )
-    cet_find_library( HDF5 NAMES hdf5_debug PATHS ENV HDF5_LIB NO_DEFAULT_PATH )
-  else()
-    cet_find_library( HDF5 NAMES hdf5 PATHS ENV HDF5_LIB NO_DEFAULT_PATH )
-  endif()
-endif()
-
 
 # macros for artdaq_dictionary and simple_plugin
 include(ArtDictionary)
