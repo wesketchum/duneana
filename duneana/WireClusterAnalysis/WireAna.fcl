@@ -1,0 +1,29 @@
+BEGIN_PROLOG
+
+standard_wireana:
+{
+  module_type:	WireAna
+  #====================
+  InputWireProducerLabel:       "caldata"
+  SimChannelLabel:              "elecDrift"
+  SimulationProducerLabel:      "largeant"
+  LogLevel:                     3
+  DoAssns:                      false
+  MakeCluster:                  true
+  ChannelPerApa:                2560
+  TickesPerWire:                6000
+  DBSCAN_Eps:                   4.5
+  DBSCAN_Drift:                 1.6
+  DBSCAN_Pitch:                 3.0
+  IMAGE_CHANNEL_WIDTH:          13
+  IMAGE_TICK_WIDTH:             400
+  IMAGE_REBIN_TICK:             4
+  DUMPMAXROW:                   50000
+  DUMPFILENAME:                 "data"
+  DUMPNCLUSTERS:                -1
+  TREENAME:                     "wireana"
+  Histo_EMax:                   10
+  Histo_CMax:                   10000
+}
+
+END_PROLOG
