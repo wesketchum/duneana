@@ -8,9 +8,6 @@ cet_build_plugin(CAFMaker   art::module
                         nugen::NuReweight
                         nugen::NuReweight_art
 			nusimdata::SimulationBase
-                        GFWGHEP
-                        GFWEG
-			GFWPARDAT
                         ART_FRAMEWORK_CORE
                         ART_FRAMEWORK_PRINCIPAL
                         ART_FRAMEWORK_SERVICES_REGISTRY
@@ -23,50 +20,7 @@ cet_build_plugin(CAFMaker   art::module
                         messagefacility::MF_MessageLogger
                         cetlib::cetlib cetlib_except
                         ROOT_BASIC_LIB_LIST
-			GFWALG
-			GFWPARDAT
-			GPHDISXS
-			GPHDISXS
-			GPHCHMXS
-			GPHCOHEG
-			GPHCOHXS
-			GPHDFRCEG
-			GPHDISEG
-			GPHXSIG
-			GPHDCY
-			GPHQELXS
-			GPHQELXS
-			GFWGHEP
-			GFWEG
-			GPHCMN
-			GFWEG
-			GPHRESXS
-			GPHHADTRANSP
-			GPHHADNZ
-			GFWINT
-			GPHQELXS
-			GPHMNUCEG
-			GPHMNUCXS
-			GPHAMNGEG
-			GPHAMNGXS
-			GPHNUELEG
-			GPHNUELXS
-			GFWNTP
-			GPHNUCLST
-			GFWNUM
-			GFWPARDAT
-			GPHPDF
-			GPHQELEG
-			GPHRESEG
-			GPHRESXS
-			GFWREG
-			GPHRESXS
-			GFWUTL
-			GTLGEO
-			GTLFLX
-			GPHMEL
-			GPHNDCY
-			GFWMSG
+			${GENIE_LIB_LIST}
                         systematicstools::interface
 			systematicstools::interpreters
 			systematicstools::utility
