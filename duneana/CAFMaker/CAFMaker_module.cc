@@ -120,7 +120,8 @@ namespace caf {
 
     fhicl::ParameterSet syst_provider_config = pset.get<fhicl::ParameterSet>("generated_systematic_provider_configuration");
 
-    fSystProviders = systtools::ConfigureISystProvidersFromParameterHeaders(syst_provider_config);
+    // TODO - this was crashing with NULL genie Registry
+    //    fSystProviders = systtools::ConfigureISystProvidersFromParameterHeaders(syst_provider_config);
   }
 
   //------------------------------------------------------------------------------
