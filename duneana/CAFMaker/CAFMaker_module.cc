@@ -25,6 +25,8 @@
 #include "duneanaobj/StandardRecord/StandardRecord.h"
 #include "duneanaobj/StandardRecord/SRGlobal.h"
 
+#include "duneanaobj/StandardRecord/Flat/FlatRecord.h"
+
 //#include "Utils/AppInit.h"
 #include "nusimdata/SimulationBase/GTruth.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
@@ -73,6 +75,8 @@ namespace caf {
 
 
     private:
+      void AddGlobalTreeToFile(TFile* f, SRGlobal& global);
+
       std::string fMVASelectLabel;
       std::string fMVASelectNueLabel;
       std::string fMVASelectNumuLabel;
@@ -84,9 +88,13 @@ namespace caf {
       std::string fEnergyRecoNumuLabel;
       std::string fMVAMethod;
 
-      TFile* fOutFile;
-      TTree* fTree;
-      TTree* fMetaTree;
+      TFile* fOutFile = 0;
+      TTree* fTree = 0;
+      TTree* fMetaTree = 0;
+
+      TFile* fFlatFile = 0;
+      TTree* fFlatTree = 0;
+      flat::Flat<caf::StandardRecord>* fFlatRecord = 0;
 
       double meta_pot;
       int meta_run, meta_subrun, meta_version;
@@ -98,7 +106,7 @@ namespace caf {
 
   //------------------------------------------------------------------------------
   CAFMaker::CAFMaker(fhicl::ParameterSet const& pset)
-    : EDAnalyzer(pset), fOutFile(0)
+    : EDAnalyzer(pset)
   {
     fMVASelectLabel = pset.get<std::string>("MVASelectLabel");
     fMVASelectNueLabel = pset.get<std::string>("MVASelectNueLabel");
@@ -122,6 +130,18 @@ namespace caf {
 
     // TODO - this was crashing with NULL genie Registry
     //    fSystProviders = systtools::ConfigureISystProvidersFromParameterHeaders(syst_provider_config);
+
+
+    if(pset.get<bool>("CreateCAF", true)){
+      fOutFile = new TFile("caf.root", "RECREATE");
+    }
+
+    if(pset.get<bool>("CreateFlatCAF", true)){
+      // LZ4 is the fastest format to decompress. I get 3x faster loading with
+      // this compared to the default, and the files are only slightly larger.
+      fFlatFile = new TFile("flatcaf.root", "RECREATE", "",
+                            ROOT::CompressionSettings(ROOT::kLZ4, 1));
+    }
   }
 
   //------------------------------------------------------------------------------
@@ -132,18 +152,33 @@ namespace caf {
   //------------------------------------------------------------------------------
   void CAFMaker::beginJob()
   {
-    fOutFile = new TFile("caf.root", "RECREATE");
-    fTree = new TTree("cafTree", "cafTree");
-    fMetaTree = new TTree("meta", "meta");
+    if(fOutFile){
+      fOutFile->cd();
+      fTree = new TTree("cafTree", "cafTree");
 
-    // Create the branch. We will update the address before we write the tree
-    caf::StandardRecord* rec = 0;
-    fTree->Branch("rec", &rec);
+      // Create the branch. We will update the address before we write the tree
+      caf::StandardRecord* rec = 0;
+      fTree->Branch("rec", &rec);
+    }
+
+    if(fFlatFile){
+      fFlatFile->cd();
+      fFlatTree = new TTree("cafTree", "cafTree");
+
+      fFlatRecord = new flat::Flat<caf::StandardRecord>(fFlatTree, "rec", "", 0);
+    }
+
+
+    fMetaTree = new TTree("meta", "meta");
 
     fMetaTree->Branch("pot", &meta_pot, "pot/D");
     fMetaTree->Branch("run", &meta_run, "run/I");
     fMetaTree->Branch("subrun", &meta_subrun, "subrun/I");
     fMetaTree->Branch("version", &meta_version, "version/I");
+
+    meta_pot = 0.;
+    meta_version = 1;
+
 
     caf::SRGlobal global;
 
@@ -161,16 +196,20 @@ namespace caf {
       }
     }
 
-    fOutFile->cd();
+    if(fOutFile) AddGlobalTreeToFile(fOutFile, global);
+    if(fFlatFile) AddGlobalTreeToFile(fFlatFile, global);
+  }
+
+  //------------------------------------------------------------------------------
+  void CAFMaker::AddGlobalTreeToFile(TFile* f, SRGlobal& global)
+  {
+    f->cd();
     TTree* globalTree = new TTree("globalTree", "globalTree");
     caf::SRGlobal* pglobal = &global;
     TBranch* br = globalTree->Branch("global", "caf::SRGlobal", &pglobal);
     if(!br) abort();
     globalTree->Fill();
     globalTree->Write();
-
-    meta_pot = 0.;
-    meta_version = 1;
   }
 
   //------------------------------------------------------------------------------
@@ -184,8 +223,11 @@ namespace caf {
   void CAFMaker::analyze(art::Event const & evt)
   {
     caf::StandardRecord sr;
-    caf::StandardRecord* psr = &sr;
-    fTree->SetBranchAddress("rec", &psr);
+
+    if(fTree){
+      caf::StandardRecord* psr = &sr;
+      fTree->SetBranchAddress("rec", &psr);
+    }
 
     auto pidin = evt.getHandle<dunemva::MVASelectPID>(fMVASelectLabel);
     auto pidinnue = evt.getHandle<dunemva::MVASelectPID>(fMVASelectNueLabel);
@@ -431,7 +473,15 @@ namespace caf {
       }
     } // loop through MC truth i
 
-    fTree->Fill();
+    if(fTree){
+      fTree->Fill();
+    }
+
+    if(fFlatTree){
+      fFlatRecord->Clear();
+      fFlatRecord->Fill(sr);
+      fFlatTree->Fill();
+    }
   }
 
   //------------------------------------------------------------------------------
@@ -444,10 +494,19 @@ namespace caf {
   {
     fMetaTree->Fill();
 
-    fOutFile->cd();
-    fTree->Write();
-    fMetaTree->Write();
-    fOutFile->Close();
+    if(fOutFile){
+      fOutFile->cd();
+      fTree->Write();
+      fMetaTree->Write();
+      fOutFile->Close();
+    }
+
+    if(fFlatFile){
+      fFlatFile->cd();
+      fFlatTree->Write();
+      fMetaTree->Write();
+      fFlatFile->Close();
+    }
   }
 
   DEFINE_ART_MODULE(CAFMaker)

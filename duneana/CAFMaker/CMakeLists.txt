@@ -5,6 +5,7 @@ include_directories ( $ENV{GENIE_INC}/GENIE )
 
 cet_build_plugin(CAFMaker   art::module
                         duneanaobj_StandardRecord
+                        duneanaobj_StandardRecordFlat
                         nugen::NuReweight
                         nugen::NuReweight_art
 			nusimdata::SimulationBase
