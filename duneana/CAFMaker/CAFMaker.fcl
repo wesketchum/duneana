@@ -8,6 +8,9 @@ dunefd_cafmaker:
 {
     module_type:             "CAFMaker"
 
+    CreateCAF: true
+    CreateFlatCAF: true
+
     MVASelectLabel:          "mvaselect"
 
     MVASelectNueLabel:  "mvaselectnue"
