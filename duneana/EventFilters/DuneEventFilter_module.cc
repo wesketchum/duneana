@@ -21,6 +21,7 @@
 // If that range does not exist or is not valid, all events are processed.
 
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <set>
 
@@ -30,6 +31,8 @@
 #include "art/Framework/Core/EDFilter.h" 
 #include "art/Framework/Core/ModuleMacros.h" 
 #include "art/Framework/Principal/Event.h" 
+#include "art/Framework/Principal/Run.h" 
+#include "art/Framework/Principal/SubRun.h" 
 
 class DuneEventFilter : public art::EDFilter {
 
@@ -159,7 +162,18 @@ bool DuneEventFilter::filter(art::Event & evt) {
   using std::endl;
   using std::string;
   const string myname = "DuneEventFilter::filter: ";
+  std::ostringstream ssrev;
+  Index irun = evt.getRun().id().run();
+  Index isru = evt.getSubRun().id().subRun();
+  ssrev << "run " << irun;
+  if ( isru > 0 ) {
+    ssrev << "-" << isru;
+  }
   Index ievt = evt.event();
+  ssrev << " event " << ievt;
+  string srev = ssrev.str();
+  string srevc = srev;
+  srevc[0] = 'R';
   ++m_nproc;
   bool keep = true;
   if ( keep && m_SelectEvents.size() ) keep = m_SelectEvents.count(ievt);
@@ -171,12 +185,12 @@ bool DuneEventFilter::filter(art::Event & evt) {
     if ( find(skipEvents.begin(), skipEvents.end(), ievt) != skipEvents.end() ) {
       keep = false;
       if ( m_LogLevel >= 3 ) {
-        cout << myname << "  Event " << ievt << " rejected by SkipEventTool" << endl;
+        cout << myname << "  " << srevc << " rejected by SkipEventTool" << endl;
       }
     }
   }
   if ( m_LogLevel >= 2 ) {
-    cout << myname << (keep ? "Sel" : "Rej") << "ecting event " << ievt << endl;
+    cout << myname << (keep ? "Sel" : "Rej") << "ecting " << srev << endl;
   }
   if ( keep ) ++m_nsel;
   return keep;
