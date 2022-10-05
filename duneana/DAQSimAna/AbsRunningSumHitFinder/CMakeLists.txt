@@ -1,4 +1,4 @@
-make_dune_tool_builder(dunecore::absRunningSumTPFinderTool)
+make_dune_tool_builder(dunecore::AbsRunningSumTPFinderTool)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
   dunepdlegacy_Services_ChannelMap_PdspChannelMapService_service
@@ -27,17 +27,12 @@ art_make( BASENAME_ONLY MODULE_LIBRARIES
   messagefacility::MF_MessageLogger
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
-  EXCLUDE read_packed.cxx absRunningSumTPFinderPass1_tool.cc absRunningSumTPFinderPass2_tool.cc 
+  EXCLUDE read_packed.cxx AbsRunningSumTPFinderPass1_tool.cc
   )
 
-cet_build_plugin(absRunningSumTPFinderPass1 art::tool
-  fhiclcpp cetlib::cetlib cetlib_except
-  
-)
-cet_build_plugin(absRunningSumTPFinderPass2 art::tool
+cet_build_plugin(AbsRunningSumTPFinderPass1 art::tool
   fhiclcpp cetlib::cetlib cetlib_except
 
-  duneana_DAQSimAna_absRunningSumHitFinder_absRunningSumTPFinderPass1_tool
 )
 
 install_fhicl()

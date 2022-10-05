@@ -1,29 +1,31 @@
-#ifndef absRunningSumTPFinderTool_h
-#define absRunningSumTPFinderTool_h
+#ifndef AbsRunningSumTPFinderTool_h
+#define AbsRunningSumTPFinderTool_h
 
 #include <vector>
 #include <iostream>
 
-class absRunningSumTPFinderTool {
+class AbsRunningSumTPFinderTool {
  
  public:
   struct Hit
   {
-  Hit(int _channel, int _startTime, int _charge, int _timeOverThreshold)
+  Hit(int _channel, int _startTime, int _peakCharge, int _SADC, int _timeOverThreshold)
   : channel(_channel),
       startTime(_startTime),
-      charge(_charge),
+      peakCharge(_peakCharge),
+      SADC(_SADC),
       timeOverThreshold(_timeOverThreshold)
     {}
     int channel;
     int startTime;
-    int charge;
+    int peakCharge;
+    int SADC;
     int timeOverThreshold;
   };
 
-  virtual ~absRunningSumTPFinderTool() =default;
+  virtual ~AbsRunningSumTPFinderTool() =default;
 
-  virtual std::vector<absRunningSumTPFinderTool::Hit>
+  virtual std::vector<AbsRunningSumTPFinderTool::Hit>
     findHits(const std::vector<unsigned int>& channel_numbers, 
              const std::vector<std::vector<short>>& adc_samples) = 0;
  
