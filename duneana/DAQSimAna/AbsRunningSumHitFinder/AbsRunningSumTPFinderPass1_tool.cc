@@ -84,11 +84,13 @@ std::vector<short> AbsRunningSumTPFinderPass1::AbsRunningSum(const std::vector<s
   // Absolute Running Sum Algorithm
   //---------------------------------------------
 
-  //initialise 
+  //initialise
+  float adcMax = 32767; 
   short s = 2;
   std::vector<short> absRS(filtered.size(), 0); absRS[0] = filtered[0]/s;
   for (size_t i=0; i<filtered.size(); ++i) { 
-    absRS[i] = R*absRS[i-1] + std::abs(filtered[i]/s);
+    //guard the signal from overflowing
+    absRS[i] = std::min(R*absRS[i-1] + std::abs(filtered[i]/s), adcMax);
   }
   return absRS;
 }
