@@ -663,7 +663,9 @@ void SNAna::analyze(art::Event const & evt)
 
     for(size_t i=0; i<True_VertX.size(); ++i) {
       bool caught = false;
-      geo::Point_t const Vertex{True_VertX[i], True_VertY[i], True_VertZ[i]};
+      double Vertex[3] = {True_VertX[i],
+                          True_VertY[i],
+                          True_VertZ[i]};
       geo::WireID WireID;
       geo::PlaneID Plane(geo->FindTPCAtPosition(Vertex),geo::kZ);
       try
@@ -896,9 +898,11 @@ void SNAna::analyze(art::Event const & evt)
           if(fSaveNeighbourADCs)
             SaveNeighbourADC(channel,rawDigitsVecHandle, badChannels, ThisHit);
 
+          double wire_start[3] = {0,0,0};
+          double wire_end[3] = {0,0,0};
           auto& wgeo = geo->WireIDToWireGeo(ThisHit.WireID());
-          auto const wire_start = wgeo.GetStart();
-          auto const wire_end = wgeo.GetEnd();
+          wgeo.GetStart(wire_start);
+          wgeo.GetEnd(wire_end);
           Hit_X_start.push_back(wire_start[0]);
           Hit_Y_start.push_back(wire_start[1]);
           Hit_Z_start.push_back(wire_start[2]);
