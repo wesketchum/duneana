@@ -473,7 +473,7 @@ void TrackingEfficiency::TrackingEfficiency::MCTruthInformation (detinfo::Detect
       // -- Check if hit is within drift window...
       geo::CryostatGeo const& cryo = geom->Cryostat(tpcid.Cryostat);
       geo::TPCGeo      const& tpc  = cryo.TPC(tpcid.TPC); 
-      double XPlanePosition      = tpc.PlaneLocation(0)[0];
+      double XPlanePosition      = tpc.Plane(0).GetCenter()[0];
       double DriftTimeCorrection = fabs( tmpPosition[0] - XPlanePosition ) / XDriftVelocity;
       double TimeAtPlane         = particle->T() + DriftTimeCorrection;
       if ( TimeAtPlane < trigger_offset(clockData)
