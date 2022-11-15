@@ -458,7 +458,7 @@ void DAQQuickClustering::analyze(art::Event const & evt)
   Py = Py_/Pnorm;
   Pz = Pz_/Pnorm;
   bool caught = false;
-  double Vertex[3] = {VertX, VertY, VertZ};
+  geo::Point_t const Vertex{VertX, VertY, VertZ};
   geo::WireID WireID;
   geo::PlaneID Plane(geo->FindTPCAtPosition(Vertex),geo::kZ);
   try
