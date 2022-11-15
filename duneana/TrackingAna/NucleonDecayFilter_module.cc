@@ -134,12 +134,8 @@ namespace filt{
 	// ------ Look at each individual IDE ------
 	for (auto const& ide:idevec) {
 	  int ideTrackID = ide.trackID;
-	  double idePos[3];
-	  idePos[0] = ide.x;
-	  idePos[1] = ide.y;
-	  idePos[2] = ide.z;
 	  // ------ Is the hit in a TPC? ------
-	  geo::TPCID tpcid=geo->FindTPCAtPosition(idePos);
+          geo::TPCID tpcid=geo->FindTPCAtPosition(geo::Point_t{ide.x, ide.y, ide.z});
 	  if (!(geo->HasTPC(tpcid)) ) {
 	    //std::cout << "Outside the Active volume I found at the top!" << std::endl;
 	    continue;
@@ -198,18 +194,16 @@ namespace filt{
     ActiveBounds[1] = ActiveBounds[3] = ActiveBounds[5] = -DBL_MAX;
     // ----- FixMe: Assume single cryostats ------
     auto const* geom = lar::providerFrom<geo::Geometry>();
-    for (geo::TPCGeo const& TPC: geom->IterateTPCs()) {
+    for (geo::TPCGeo const& TPC: geom->Iterate<geo::TPCGeo>()) {
       // get center in world coordinates
-      const double origin[3] = {0.};
-      double center[3] = {0.};
-      TPC.LocalToWorld(origin, center);
+      auto const center = TPC.GetCenter();
       double tpcDim[3] = {TPC.HalfWidth(), TPC.HalfHeight(), 0.5*TPC.Length() };
-      if( center[0] - tpcDim[0] < ActiveBounds[0] ) ActiveBounds[0] = center[0] - tpcDim[0];
-      if( center[0] + tpcDim[0] > ActiveBounds[1] ) ActiveBounds[1] = center[0] + tpcDim[0];
-      if( center[1] - tpcDim[1] < ActiveBounds[2] ) ActiveBounds[2] = center[1] - tpcDim[1];
-      if( center[1] + tpcDim[1] > ActiveBounds[3] ) ActiveBounds[3] = center[1] + tpcDim[1];
-      if( center[2] - tpcDim[2] < ActiveBounds[4] ) ActiveBounds[4] = center[2] - tpcDim[2];
-      if( center[2] + tpcDim[2] > ActiveBounds[5] ) ActiveBounds[5] = center[2] + tpcDim[2];
+      if( center.X() - tpcDim[0] < ActiveBounds[0] ) ActiveBounds[0] = center.X() - tpcDim[0];
+      if( center.X() + tpcDim[0] > ActiveBounds[1] ) ActiveBounds[1] = center.X() + tpcDim[0];
+      if( center.Y() - tpcDim[1] < ActiveBounds[2] ) ActiveBounds[2] = center.Y() - tpcDim[1];
+      if( center.Y() + tpcDim[1] > ActiveBounds[3] ) ActiveBounds[3] = center.Y() + tpcDim[1];
+      if( center.Z() - tpcDim[2] < ActiveBounds[4] ) ActiveBounds[4] = center.Z() - tpcDim[2];
+      if( center.Z() + tpcDim[2] > ActiveBounds[5] ) ActiveBounds[5] = center.Z() + tpcDim[2];
     } // for all TPC
     std::cout << "Active Boundaries: "
 	      << "\n\tx: " << ActiveBounds[0] << " to " << ActiveBounds[1]

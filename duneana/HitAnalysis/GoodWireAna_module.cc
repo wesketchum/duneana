@@ -214,45 +214,40 @@ void GoodWireAna::makeHistoSetForThisRun( int runID )
   std::map< std::pair<size_t,size_t>, std::vector<TH1D*> > outputDistMap;
 
   //Loop over the cryostats 
-  for( size_t iCry = 0; iCry < fNCry; ++iCry ){
+  for( auto const& tpcid : fGeometry->Iterate<geo::TPCID>()) {
 
-    //Find the number of TPCs in this cryostat
-    size_t nTPCs = fGeometry->NTPC(iCry);
-    
-    //Loop over TPCs and create a vector for each one that will
-    //hold the different planes' histograms
-    for( size_t iTPC = 0; iTPC < nTPCs; ++iTPC ){
       std::vector<TH1D*> histoVect;
       std::vector<TH1D*> histoDistVect;
 
       //Define the pair
+    auto const [iCry, iTPC] = std::make_pair(tpcid.Cryostat, tpcid.TPC);
       std::pair<size_t,size_t> CryTPCPair(iCry,iTPC);
 
       //Get geometry information
-      size_t nWiresU = fGeometry->Nwires(0,iTPC,iCry);
-      size_t nWiresV = fGeometry->Nwires(1,iTPC,iCry);
-      size_t nWiresW = fGeometry->Nwires(2,iTPC,iCry);
+    size_t nWiresU = fGeometry->Nwires(geo::PlaneID{tpcid, 0});
+    size_t nWiresV = fGeometry->Nwires(geo::PlaneID{tpcid, 1});
+    size_t nWiresW = fGeometry->Nwires(geo::PlaneID{tpcid, 2});
 
       char name[50];
       char title[105];
       
       //U Plane
-      int n = sprintf( name, "r%d_cry%lu_tpc%lu_U_WireHitOcc", runID, iCry, iTPC);
-      int t = sprintf( title, ";Run %d, Cryostat %lu, TPC %lu, U Plane Wire Hit Occupancies;", runID, iCry, iTPC);
+    int n = sprintf( name, "r%d_cry%u_tpc%u_U_WireHitOcc", runID, iCry, iTPC);
+    int t = sprintf( title, ";Run %d, Cryostat %u, TPC %u, U Plane Wire Hit Occupancies;", runID, iCry, iTPC);
       TH1D* uHisto = fTFS->make<TH1D>(name,title,nWiresU,0,nWiresU);
       uHisto->GetXaxis()->SetTitle("Wire Index in Plane");
       uHisto->GetYaxis()->SetTitle("Hit Occupancy");
 
       //U Plane
-      n = sprintf( name, "r%d_cry%lu_tpc%lu_V_WireHitOcc", runID, iCry, iTPC);
-      t = sprintf( title, ";Run %d, Cryostat %lu, TPC %lu, V Plane Wire Hit Occupancies;", runID, iCry, iTPC);
+    n = sprintf( name, "r%d_cry%u_tpc%u_V_WireHitOcc", runID, iCry, iTPC);
+    t = sprintf( title, ";Run %d, Cryostat %u, TPC %u, V Plane Wire Hit Occupancies;", runID, iCry, iTPC);
       TH1D* vHisto = fTFS->make<TH1D>(name,title,nWiresV,0,nWiresV);
       vHisto->GetXaxis()->SetTitle("Wire Index in Plane");
       vHisto->GetYaxis()->SetTitle("Hit Occupancy");
 
       //W Plane
-      n = sprintf( name, "r%d_cry%lu_tpc%lu_W_WireHitOcc", runID, iCry, iTPC);
-      t = sprintf( title, ";Run %d, Cryostat %lu, TPC %lu, W Plane Wire Hit Occupancies;", runID, iCry, iTPC);
+    n = sprintf( name, "r%d_cry%u_tpc%u_W_WireHitOcc", runID, iCry, iTPC);
+    t = sprintf( title, ";Run %d, Cryostat %u, TPC %u, W Plane Wire Hit Occupancies;", runID, iCry, iTPC);
       TH1D* wHisto = fTFS->make<TH1D>(name,title,nWiresW,0,nWiresW);
       wHisto->GetXaxis()->SetTitle("Wire Index in Plane");
       wHisto->GetYaxis()->SetTitle("Hit Occupancy");
@@ -265,22 +260,22 @@ void GoodWireAna::makeHistoSetForThisRun( int runID )
 
       //Now make the hit occupancy distributions
       //U Plane
-      n = sprintf( name, "r%d_cry%lu_tpc%lu_U_HitOccDist", runID, iCry, iTPC);
-      t = sprintf( title, ";Run %d, Cryostat %lu, TPC %lu, U Plane Hit Occupancy Distribution;", runID, iCry, iTPC);
+    n = sprintf( name, "r%d_cry%u_tpc%u_U_HitOccDist", runID, iCry, iTPC);
+    t = sprintf( title, ";Run %d, Cryostat %u, TPC %u, U Plane Hit Occupancy Distribution;", runID, iCry, iTPC);
       TH1D* uHistoDist = fTFS->make<TH1D>(name,title,fNBinsDist,0,-1);
       uHistoDist->GetXaxis()->SetTitle("Hit Occupancy");
       uHistoDist->GetYaxis()->SetTitle("Number of Wires");
       
       //U Plane
-      n = sprintf( name, "r%d_cry%lu_tpc%lu_V_HitOccDist", runID, iCry, iTPC);
-      t = sprintf( title, ";Run %d, Cryostat %lu, TPC %lu, V Plane Hit Occupancy Distribution;", runID, iCry, iTPC);
+    n = sprintf( name, "r%d_cry%u_tpc%u_V_HitOccDist", runID, iCry, iTPC);
+    t = sprintf( title, ";Run %d, Cryostat %u, TPC %u, V Plane Hit Occupancy Distribution;", runID, iCry, iTPC);
       TH1D* vHistoDist = fTFS->make<TH1D>(name,title,fNBinsDist,0,-1);
       vHistoDist->GetXaxis()->SetTitle("Hit Occupancy");
       vHistoDist->GetYaxis()->SetTitle("Number of Wires");
       
       //W Plane
-      n = sprintf( name, "r%d_cry%lu_tpc%lu_W_HitOccDist", runID, iCry, iTPC);
-      t = sprintf( title, ";Run %d, Cryostat %lu, TPC %lu, W Plane Hit Occupancy Distribution;", runID, iCry, iTPC);
+    n = sprintf( name, "r%d_cry%u_tpc%u_W_HitOccDist", runID, iCry, iTPC);
+    t = sprintf( title, ";Run %d, Cryostat %u, TPC %u, W Plane Hit Occupancy Distribution;", runID, iCry, iTPC);
       TH1D* wHistoDist = fTFS->make<TH1D>(name,title,fNBinsDist,0,-1);
       wHistoDist->GetXaxis()->SetTitle("Hit Occupancy");
       wHistoDist->GetYaxis()->SetTitle("Number of Wires");
@@ -298,7 +293,6 @@ void GoodWireAna::makeHistoSetForThisRun( int runID )
       outputMap.emplace(CryTPCPair,histoVect);
       outputDistMap.emplace(CryTPCPair,histoDistVect);
     }      
-  }
  
   //Now push back this output vector into the persistent one, with the run
   //number as the key
@@ -751,7 +745,7 @@ void GoodWireAna::writeListOfBadWires(std::vector<std::vector<size_t> > badWireV
   std::vector<size_t> tempVect;
 
   //Initialize these vectors to the standard of Alex
-  size_t nTPCs = fGeometry->NTPC(0);
+  size_t nTPCs = fGeometry->NTPC(geo::CryostatID{0});
   for( size_t iQ = 0; iQ < nTPCs ; ++iQ ){
     tempVect.push_back(0);
   }
@@ -942,14 +936,14 @@ void GoodWireAna::findRepeatingWireCutoff()
   //later, we can stop filling our occupancy histograms at this point
   
   //Loop over TPCs
-  size_t iCry = 0;
-  size_t nTPCs = fGeometry->NTPC(iCry);
-  size_t nPlanes = 3;
+  unsigned const iCry = 0;
+  size_t const nTPCs = fGeometry->NTPC();
+  unsigned const nPlanes = 3;
 
-  for( size_t iTPC = 0; iTPC < nTPCs; ++iTPC ){
+  for( unsigned int iTPC = 0; iTPC < nTPCs; ++iTPC ){
     
     //Loop over planes
-    for( size_t iPlane = 0; iPlane < nPlanes; ++iPlane ){
+    for( unsigned int iPlane = 0; iPlane < nPlanes; ++iPlane ){
       
       //Select the correct plane
       if( iPlane == 2 ) continue;
@@ -957,10 +951,11 @@ void GoodWireAna::findRepeatingWireCutoff()
       size_t theFinalWire = 0;
       
       //Loop over wires
-      for( size_t iWire = 0; iWire < fGeometry->Nwires(iPlane,iTPC,iCry); ++iWire ){
+      geo::PlaneID const planeID{iCry, iTPC, iPlane};
+      for( size_t iWire = 0; iWire < fGeometry->Nwires(planeID); ++iWire ){
 	
 	//Construct the wireID
-	geo::WireID theWireID( iCry, iTPC, iPlane, iWire );	
+        geo::WireID const theWireID( planeID, iWire );
 
 	//Get the channel corresponding to this wire
 	size_t channel = fGeometry->PlaneWireToChannel(theWireID);

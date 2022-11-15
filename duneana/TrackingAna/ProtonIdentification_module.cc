@@ -173,19 +173,17 @@ void ProtonIdentification::ProtonIdentification::beginJob()
   boundaries[1] = boundaries[3] = boundaries[5] = -DBL_MAX;
 
   auto const* geom = lar::providerFrom<geo::Geometry>();
-  for (geo::TPCGeo const& TPC: geom->IterateTPCs()) {
+  for (geo::TPCGeo const& TPC: geom->Iterate<geo::TPCGeo>()) {
     // get center in world coordinates
-    const double origin[3] = {0.};
-    double center[3] = {0.};
-    TPC.LocalToWorld(origin, center);
+    auto const center = TPC.GetCenter();
     //double tpcDim[3] = {TPC.ActiveHalfWidth(), TPC.ActiveHalfHeight(), 0.5*TPC.ActiveLength() };
     double tpcDim[3] = {TPC.HalfWidth(), TPC.HalfHeight(), 0.5*TPC.Length() };
-    if( center[0] - tpcDim[0] < boundaries[0] ) boundaries[0] = center[0] - tpcDim[0];
-    if( center[0] + tpcDim[0] > boundaries[1] ) boundaries[1] = center[0] + tpcDim[0];
-    if( center[1] - tpcDim[1] < boundaries[2] ) boundaries[2] = center[1] - tpcDim[1];
-    if( center[1] + tpcDim[1] > boundaries[3] ) boundaries[3] = center[1] + tpcDim[1];
-    if( center[2] - tpcDim[2] < boundaries[4] ) boundaries[4] = center[2] - tpcDim[2];
-    if( center[2] + tpcDim[2] > boundaries[5] ) boundaries[5] = center[2] + tpcDim[2];
+    if( center.X() - tpcDim[0] < boundaries[0] ) boundaries[0] = center.X() - tpcDim[0];
+    if( center.X() + tpcDim[0] > boundaries[1] ) boundaries[1] = center.X() + tpcDim[0];
+    if( center.Y() - tpcDim[1] < boundaries[2] ) boundaries[2] = center.Y() - tpcDim[1];
+    if( center.Y() + tpcDim[1] > boundaries[3] ) boundaries[3] = center.Y() + tpcDim[1];
+    if( center.Z() - tpcDim[2] < boundaries[4] ) boundaries[4] = center.Z() - tpcDim[2];
+    if( center.Z() + tpcDim[2] > boundaries[5] ) boundaries[5] = center.Z() + tpcDim[2];
     //std::cout << boundaries[0] << " " << boundaries[1] << " " << boundaries[2] << " " << boundaries[3] << " " <<boundaries[4] << " " << boundaries[5] << std::endl;
   } // for all TPC
   //std::cout << boundaries[0] << " " << boundaries[1] << " " << boundaries[2] << " " << boundaries[3] << " " <<boundaries[4] << " " << boundaries[5] << std::endl;
@@ -333,9 +331,8 @@ void ProtonIdentification::ProtonIdentification::analyze(art::Event const & evt)
     else ThisPri=0;
     for ( unsigned int a=0; a<particle->NumberTrajectoryPoints(); ++a ) {
       // Get Positions and if in TPC
-      const TLorentzVector& tmpPosition=particle->Position(a);
-      double const tmpPosArray[]={tmpPosition[0],tmpPosition[1],tmpPosition[2]};
-      geo::TPCID tpcid = geom->FindTPCAtPosition(tmpPosArray);
+      auto const position = geo::vect::toPoint(particle->Position(a).Vect());
+      geo::TPCID tpcid = geom->FindTPCAtPosition(position);
       if (tpcid.isValid && a == 0) 
 	StIn = true;
       if (tpcid.isValid && a == (particle->NumberTrajectoryPoints() -1) )
@@ -344,9 +341,9 @@ void ProtonIdentification::ProtonIdentification::analyze(art::Event const & evt)
       if (!InTPC) {
 	if (tpcid.isValid) {
 	  InTPC = true;
-	  ThisStX = tmpPosArray[0];
-	  ThisStY = tmpPosArray[1];
-	  ThisStZ = tmpPosArray[2];
+          ThisStX = position.X();
+          ThisStY = position.Y();
+          ThisStZ = position.Z();
 	  // Increment some total output variables....
 	  if (abs(particle->PdgCode()) == 13 ) ++TrueMuons;
 	  else if (abs(particle->PdgCode()) == 11 ) ++TrueElectrons;
@@ -358,9 +355,9 @@ void ProtonIdentification::ProtonIdentification::analyze(art::Event const & evt)
 	// If already been in TPC
 	if (tpcid.isValid) {
 	  // And still in the TPC!
-	  ThisEnX = tmpPosArray[0];
-	  ThisEnY = tmpPosArray[1];
-	  ThisEnZ = tmpPosArray[2];
+          ThisEnX = position.X();
+          ThisEnY = position.Y();
+          ThisEnZ = position.Z();
 	} // Still in TPC
       } // Already in TPC
     } // Traj points
@@ -819,9 +816,6 @@ void ProtonIdentification::ProtonIdentification::MCTruthInformation (detinfo::De
   int FirstHit=0, LastHit=0;
     
   for(unsigned int MCHit=0; MCHit <  TPCLengthHits.size(); ++MCHit) {
-    const TLorentzVector& tmpPosition=particle->Position(MCHit);
-    double const tmpPosArray[]={tmpPosition[0],tmpPosition[1],tmpPosition[2]};
-    
     if (MCHit!=0) {
       TPCLengthHits[MCHit] = pow ( pow( (particle->Vx(MCHit-1)-particle->Vx(MCHit)),2)
 				   + pow( (particle->Vy(MCHit-1)-particle->Vy(MCHit)),2)
@@ -830,15 +824,15 @@ void ProtonIdentification::ProtonIdentification::MCTruthInformation (detinfo::De
       TPCEnDepos[MCHit] = 1000 * (particle->E(MCHit-1) - particle->E(MCHit));
     }
     // --- Check if hit is in TPC...
-    geo::TPCID tpcid = geom->FindTPCAtPosition(tmpPosArray);
+    auto const position = geo::vect::toPoint(particle->Position(MCHit).Vect());
+    geo::TPCID tpcid = geom->FindTPCAtPosition(position);
     if (tpcid.isValid) { 
       if (MCHit == 0 ) MCStartInTPC = true;
       if (MCHit == numberTrajectoryPoints-1 ) MCEndInTPC = true;
       // -- Check if hit is within drift window...
-      geo::CryostatGeo const& cryo = geom->Cryostat(tpcid.Cryostat);
-      geo::TPCGeo      const& tpc  = cryo.TPC(tpcid.TPC); 
-      double XPlanePosition      = tpc.Plane(0).GetCenter()[0];
-      double DriftTimeCorrection = fabs( tmpPosition[0] - XPlanePosition ) / XDriftVelocity;
+      geo::TPCGeo      const& tpc  = geom->TPC(tpcid);
+      double XPlanePosition      = tpc.Plane(0).GetCenter().X();
+      double DriftTimeCorrection = fabs( position.X() - XPlanePosition ) / XDriftVelocity;
       double TimeAtPlane         = particle->T() + DriftTimeCorrection;
       if ( TimeAtPlane < trigger_offset(clockData)
            || TimeAtPlane > trigger_offset(clockData) + WindowSize

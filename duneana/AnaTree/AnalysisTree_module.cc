@@ -3443,19 +3443,17 @@ dune::AnalysisTree::AnalysisTree(fhicl::ParameterSet const& pset) :
   ActiveBounds[1] = ActiveBounds[3] = ActiveBounds[5] = -DBL_MAX;
   // assume single cryostats
   auto const* geom = lar::providerFrom<geo::Geometry>();
-  for (geo::TPCGeo const& TPC: geom->IterateTPCs()) {
+  for (geo::TPCGeo const& TPC: geom->Iterate<geo::TPCGeo>()) {
     // get center in world coordinates
-    double origin[3] = {0.};
-    double center[3] = {0.};
-    TPC.LocalToWorld(origin, center);
+    auto const center = TPC.GetCenter();
     double tpcDim[3] = {TPC.HalfWidth(), TPC.HalfHeight(), 0.5*TPC.Length() };
 
-    if( center[0] - tpcDim[0] < ActiveBounds[0] ) ActiveBounds[0] = center[0] - tpcDim[0];
-    if( center[0] + tpcDim[0] > ActiveBounds[1] ) ActiveBounds[1] = center[0] + tpcDim[0];
-    if( center[1] - tpcDim[1] < ActiveBounds[2] ) ActiveBounds[2] = center[1] - tpcDim[1];
-    if( center[1] + tpcDim[1] > ActiveBounds[3] ) ActiveBounds[3] = center[1] + tpcDim[1];
-    if( center[2] - tpcDim[2] < ActiveBounds[4] ) ActiveBounds[4] = center[2] - tpcDim[2];
-    if( center[2] + tpcDim[2] > ActiveBounds[5] ) ActiveBounds[5] = center[2] + tpcDim[2];
+    if( center.X() - tpcDim[0] < ActiveBounds[0] ) ActiveBounds[0] = center.X() - tpcDim[0];
+    if( center.X() + tpcDim[0] > ActiveBounds[1] ) ActiveBounds[1] = center.X() + tpcDim[0];
+    if( center.Y() - tpcDim[1] < ActiveBounds[2] ) ActiveBounds[2] = center.Y() - tpcDim[1];
+    if( center.Y() + tpcDim[1] > ActiveBounds[3] ) ActiveBounds[3] = center.Y() + tpcDim[1];
+    if( center.Z() - tpcDim[2] < ActiveBounds[4] ) ActiveBounds[4] = center.Z() - tpcDim[2];
+    if( center.Z() + tpcDim[2] > ActiveBounds[5] ) ActiveBounds[5] = center.Z() + tpcDim[2];
   } // for all TPC
   std::cout << "Active Boundaries: "
             << "\n\tx: " << ActiveBounds[0] << " to " << ActiveBounds[1]
@@ -5530,13 +5528,12 @@ double dune::AnalysisTree::driftedLength(detinfo::DetectorPropertiesData const& 
   //compute the drift x range
   double vDrift = detProp.DriftVelocity()*1e-3; //cm/ns
   double xrange[2] = {DBL_MAX, -DBL_MAX };
-  for (unsigned int c=0; c<geom->Ncryostats(); ++c) {
-    for (unsigned int t=0; t<geom->NTPC(c); ++t) {
-      double Xat0 = detProp.ConvertTicksToX(0,0,t,c);
-      double XatT = detProp.ConvertTicksToX(detProp.NumberTimeSamples(),0,t,c);
-      xrange[0] = std::min(std::min(Xat0, XatT), xrange[0]);
-      xrange[1] = std::max(std::max(Xat0, XatT), xrange[1]);
-    }
+  for (auto const& tpcid : geom->Iterate<geo::TPCID>()) {
+    geo::PlaneID const planeID{tpcid, 0};
+    double Xat0 = detProp.ConvertTicksToX(0,planeID);
+    double XatT = detProp.ConvertTicksToX(detProp.NumberTimeSamples(),planeID);
+    xrange[0] = std::min({Xat0, XatT, xrange[0]});
+    xrange[1] = std::max({Xat0, XatT, xrange[1]});
   }
 
   double result = 0.;
@@ -5582,13 +5579,12 @@ double dune::AnalysisTree::driftedLength(detinfo::DetectorPropertiesData const& 
   //compute the drift x range
   double vDrift = detProp.DriftVelocity()*1e-3; //cm/ns
   double xrange[2] = {DBL_MAX, -DBL_MAX };
-  for (unsigned int c=0; c<geom->Ncryostats(); ++c) {
-    for (unsigned int t=0; t<geom->NTPC(c); ++t) {
-      double Xat0 = detProp.ConvertTicksToX(0,0,t,c);
-      double XatT = detProp.ConvertTicksToX(detProp.NumberTimeSamples(),0,t,c);
-      xrange[0] = std::min(std::min(Xat0, XatT), xrange[0]);
-      xrange[1] = std::max(std::max(Xat0, XatT), xrange[1]);
-    }
+  for (auto const& tpcid : geom->Iterate<geo::TPCID>()) {
+    geo::PlaneID const planeID{tpcid, 0};
+    double Xat0 = detProp.ConvertTicksToX(0,planeID);
+    double XatT = detProp.ConvertTicksToX(detProp.NumberTimeSamples(),planeID);
+    xrange[0] = std::min({Xat0, XatT, xrange[0]});
+    xrange[1] = std::max({Xat0, XatT, xrange[1]});
   }
 
   double result = 0.;
