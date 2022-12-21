@@ -899,12 +899,12 @@ void SNAna::analyze(art::Event const & evt)
           auto& wgeo = geo->WireIDToWireGeo(ThisHit.WireID());
           auto const wire_start = wgeo.GetStart();
           auto const wire_end = wgeo.GetEnd();
-          Hit_X_start.push_back(wire_start[0]);
-          Hit_Y_start.push_back(wire_start[1]);
-          Hit_Z_start.push_back(wire_start[2]);
-          Hit_X_end  .push_back(wire_end[0]);
-          Hit_Y_end  .push_back(wire_end[1]);
-          Hit_Z_end  .push_back(wire_end[2]);
+          Hit_X_start.push_back(wire_start.X());
+          Hit_Y_start.push_back(wire_start.Y());
+          Hit_Z_start.push_back(wire_start.Z());
+          Hit_X_end  .push_back(wire_end.X());
+          Hit_Y_end  .push_back(wire_end.Y());
+          Hit_Z_end  .push_back(wire_end.Z());
           Hit_Time   .push_back(ThisHit.PeakTime());
           Hit_RMS    .push_back(ThisHit.RMS());
           Hit_SADC   .push_back(ThisHit.SummedADC());
@@ -1057,14 +1057,11 @@ void SNAna::analyze(art::Event const & evt)
 
         map_of_ophit[gen].push_back(ophitlist.at(i));
 
-        double xyz_optdet[3]={0,0,0};
-        double xyz_world [3]={0,0,0};
-
-        geo->OpDetGeoFromOpChannel(ophitlist[i]->OpChannel()).LocalToWorld(xyz_optdet,xyz_world);
+        auto const xyz_world = geo->OpDetGeoFromOpChannel(ophitlist[i]->OpChannel()).GetCenter();
         PDS_OpHit_OpChannel   .push_back(ophitlist[i]->OpChannel());
-        PDS_OpHit_X           .push_back(xyz_world[0]);
-        PDS_OpHit_Y           .push_back(xyz_world[1]);
-        PDS_OpHit_Z           .push_back(xyz_world[2]);
+        PDS_OpHit_X           .push_back(xyz_world.X());
+        PDS_OpHit_Y           .push_back(xyz_world.Y());
+        PDS_OpHit_Z           .push_back(xyz_world.Z());
         PDS_OpHit_PeakTimeAbs .push_back(ophitlist[i]->PeakTimeAbs());
         PDS_OpHit_PeakTime    .push_back(ophitlist[i]->PeakTime());
         PDS_OpHit_Frame       .push_back(ophitlist[i]->Frame());

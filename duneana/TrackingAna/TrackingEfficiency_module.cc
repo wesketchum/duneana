@@ -460,21 +460,18 @@ void TrackingEfficiency::TrackingEfficiency::MCTruthInformation (detinfo::Detect
   MCTrackId       = particle->TrackId();
   
   for(unsigned int MCHit=0; MCHit < TPCLengthHits.size(); ++MCHit) {
-    const TLorentzVector& tmpPosition=particle->Position(MCHit);
-    double const tmpPosArray[]={tmpPosition[0],tmpPosition[1],tmpPosition[2]};
-    
     if (MCHit!=0) TPCLengthHits[MCHit] = pow ( pow( (particle->Vx(MCHit-1)-particle->Vx(MCHit)),2)
 					       + pow( (particle->Vy(MCHit-1)-particle->Vy(MCHit)),2)
 					       + pow( (particle->Vz(MCHit-1)-particle->Vz(MCHit)),2)
 					       , 0.5 );
     // --- Check if hit is in TPC...
-    geo::TPCID tpcid = geom->FindTPCAtPosition(tmpPosArray);
+    auto const position = geo::vect::toPoint(particle->Position(MCHit).Vect());
+    geo::TPCID tpcid = geom->FindTPCAtPosition(position);
     if (tpcid.isValid) { 
       // -- Check if hit is within drift window...
-      geo::CryostatGeo const& cryo = geom->Cryostat(tpcid.Cryostat);
-      geo::TPCGeo      const& tpc  = cryo.TPC(tpcid.TPC); 
-      double XPlanePosition      = tpc.Plane(0).GetCenter()[0];
-      double DriftTimeCorrection = fabs( tmpPosition[0] - XPlanePosition ) / XDriftVelocity;
+      geo::TPCGeo      const& tpc  = geom->TPC(tpcid);
+      double XPlanePosition      = tpc.Plane(0).GetCenter().X();
+      double DriftTimeCorrection = fabs( position.X() - XPlanePosition ) / XDriftVelocity;
       double TimeAtPlane         = particle->T() + DriftTimeCorrection;
       if ( TimeAtPlane < trigger_offset(clockData)
            || TimeAtPlane > trigger_offset(clockData) + WindowSize

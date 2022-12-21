@@ -307,8 +307,7 @@ double emshower::EMPi0Energy::FindVertexDetectorDistance(const simb::MCParticle*
 
   while (inTPC) {
     pos = end + ( (steps*distanceStep) * direction );
-    double currentPos[3]; currentPos[0] = pos.X(); currentPos[1] = pos.Y(); currentPos[2] = pos.Z();
-    if (!geom->FindTPCAtPosition(currentPos).isValid)
+    if (!geom->FindTPCAtPosition(geo::vect::toPoint(pos)).isValid)
       inTPC = false;
     ++steps;
   }

@@ -187,19 +187,17 @@ void NeutronDecayN2Ana::NeutronDecayN2Ana::beginJob()
 
   // ----- FixMe: Assume single cryostats ------
   auto const* geom = lar::providerFrom<geo::Geometry>();
-  for (geo::TPCGeo const& TPC: geom->IterateTPCs()) {
+  for (geo::TPCGeo const& TPC: geom->Iterate<geo::TPCGeo>()) {
     // get center in world coordinates
-    const double origin[3] = {0.};
-    double center[3] = {0.};
-    TPC.LocalToWorld(origin, center);
+    auto const center = TPC.GetCenter();
     //double tpcDim[3] = {TPC.ActiveHalfWidth(), TPC.ActiveHalfHeight(), 0.5*TPC.ActiveLength() };
     double tpcDim[3] = {TPC.HalfWidth(), TPC.HalfHeight(), 0.5*TPC.Length() }; // Gives same result as what Matt has
-    if( center[0] - tpcDim[0] < ActiveBounds[0] ) ActiveBounds[0] = center[0] - tpcDim[0];
-    if( center[0] + tpcDim[0] > ActiveBounds[1] ) ActiveBounds[1] = center[0] + tpcDim[0];
-    if( center[1] - tpcDim[1] < ActiveBounds[2] ) ActiveBounds[2] = center[1] - tpcDim[1];
-    if( center[1] + tpcDim[1] > ActiveBounds[3] ) ActiveBounds[3] = center[1] + tpcDim[1];
-    if( center[2] - tpcDim[2] < ActiveBounds[4] ) ActiveBounds[4] = center[2] - tpcDim[2];
-    if( center[2] + tpcDim[2] > ActiveBounds[5] ) ActiveBounds[5] = center[2] + tpcDim[2];
+    if( center.X() - tpcDim[0] < ActiveBounds[0] ) ActiveBounds[0] = center.X() - tpcDim[0];
+    if( center.X() + tpcDim[0] > ActiveBounds[1] ) ActiveBounds[1] = center.X() + tpcDim[0];
+    if( center.Y() - tpcDim[1] < ActiveBounds[2] ) ActiveBounds[2] = center.Y() - tpcDim[1];
+    if( center.Y() + tpcDim[1] > ActiveBounds[3] ) ActiveBounds[3] = center.Y() + tpcDim[1];
+    if( center.Z() - tpcDim[2] < ActiveBounds[4] ) ActiveBounds[4] = center.Z() - tpcDim[2];
+    if( center.Z() + tpcDim[2] > ActiveBounds[5] ) ActiveBounds[5] = center.Z() + tpcDim[2];
   } // for all TPC
 
   // Going from what I see in the event displays...
@@ -458,10 +456,6 @@ void NeutronDecayN2Ana::NeutronDecayN2Ana::analyze(art::Event const & evt) {
       for (auto const& ide:idevec) {
 	int ideTrackID = ide.trackID;
 	float ideEnergy = ide.energy;
-	double idePos[3];
-	idePos[0] = ide.x;
-	idePos[1] = ide.y;
-	idePos[2] = ide.z;
 	/*
 	  if (ideTrackID == 1 && Verbosity == 2) {
 	  float ideNumEl  = ide.numElectrons;
@@ -474,7 +468,7 @@ void NeutronDecayN2Ana::NeutronDecayN2Ana::analyze(art::Event const & evt) {
 	const simb::MCParticle& Origpart=*( truthmap[ abs(ideTrackID) ] );
 	int OrigPdgCode = Origpart.PdgCode();
 
-	geo::TPCID tpcid=geo->FindTPCAtPosition(idePos);
+        geo::TPCID tpcid=geo->FindTPCAtPosition(geo::Point_t{ide.x, ide.y, ide.z});
 	if (!(geo->HasTPC(tpcid)) ) {
 	  if (Verbosity)
 	    std::cout << "Outside the Active volume I found at the top!" << std::endl;
