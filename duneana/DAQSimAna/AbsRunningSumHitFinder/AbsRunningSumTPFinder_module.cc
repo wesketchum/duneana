@@ -76,7 +76,6 @@ void AbsRunningSumTPFinder::produce(art::Event & e)
     
     for(auto&& digit: digits_in){
       
-      // Select just the collection channels for the primitive-finding algorithm
       const geo::SigType_t sigType = geo->SignalType(digit.Channel());
       
       if(sigType==geo::kInduction){
@@ -107,7 +106,7 @@ void AbsRunningSumTPFinder::produce(art::Event & e)
 				hit.startTime,                             //START TICK.
 				hit.startTime+hit.timeOverThreshold,       //END TICK. 
 				hit.timeOverThreshold,                     //RMS.
-				hit.startTime + hit.timeOverThreshold*0.5, //PEAK_TIME.
+				hit.peakTime,                              //PEAK_TIME.
 				0,                                         //SIGMA_PEAK_TIME.
 				hit.peakCharge,                            //PEAK_AMPLITUDE.
 				0,                                         //SIGMA_PEAK_AMPLITUDE.
@@ -133,7 +132,7 @@ void AbsRunningSumTPFinder::produce(art::Event & e)
 				hit.startTime,                             //START TICK.
 				hit.startTime+hit.timeOverThreshold,       //END TICK. 
 				hit.timeOverThreshold,                     //RMS.
-				hit.startTime + hit.timeOverThreshold*0.5, //PEAK_TIME.
+				hit.peakTime,                              //PEAK_TIME.
 				0,                                         //SIGMA_PEAK_TIME.
 				hit.peakCharge,                            //PEAK_AMPLITUDE.
 				0,                                         //SIGMA_PEAK_AMPLITUDE.

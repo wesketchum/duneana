@@ -17,11 +17,8 @@ class AbsRunningSumTPFinderPass1 : public AbsRunningSumTPFinderTool {
              const std::vector<std::vector<short>>& adc_samples);
     
   protected:
-  std::vector<short> downSample        (const std::vector<short>& orig);
   std::vector<short> findPedestal      (const std::vector<short>& orig);
-  std::vector<short> filter            (const std::vector<short>& orig);
   std::vector<short> AbsRunningSum     (const std::vector<short>& orig, float R);
-  std::vector<short> findPedestal_absRS(const std::vector<short>& orig);
 
   void hitFinding(const std::vector<short>& waveform, std::vector<AbsRunningSumTPFinderTool::Hit>& hits, int channel);
 
@@ -31,10 +28,6 @@ class AbsRunningSumTPFinderPass1 : public AbsRunningSumTPFinderTool {
   short              m_signalKillThreshold;
   short              m_signalKillNContig;
   short              m_frugalNContig;
-  bool               m_doFiltering;
-  unsigned int       m_downsampleFactor;
-  std::vector<short> m_filterTaps;
-  int                m_multiplier;
   float              m_R;
 };
 
