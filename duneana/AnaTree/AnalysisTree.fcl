@@ -83,13 +83,14 @@ dune10kt_analysistree.PandoraNuVertexModuleLabel: "pandora"
 dune10kt_analysistree.TrackModuleLabel: [ "pmtrack", "pmtracktc", "pandoraTrack", "pmtrajfit" ]
 dune10kt_analysistree.CalorimetryModuleLabel: [ "pmtrackcalo", "pmtracktccalo", "pandoracalo", "pmtrajfitcalo" ]
 dune10kt_analysistree.ParticleIDModuleLabel:       [ "pmtrackpid", "pmtracktcpid", "pandorapid", "pmtrajfitpid" ]
+SpacePointSolverModuleLabel: "spsolve"
 dune10kt_analysistree.FlashT0FinderLabel: [ "", "", "", "" ]
 dune10kt_analysistree.MCT0FinderLabel:   [ "", "", "", "" ]
 dune10kt_analysistree.CosmicTaggerAssocLabel:  [ "", "", "", "" ]
 dune10kt_analysistree.ContainmentTaggerAssocLabel: [ "", "", "", "" ]
 dune10kt_analysistree.FlashMatchAssocLabel: [ "", "", "", "" ]
 dune10kt_analysistree.VertexModuleLabel: [ "linecluster", "pmtrack", "pandora" ]
-dune10kt_analysistree.ShowerModuleLabel:          ["emshower"]
+dune10kt_analysistree.ShowerModuleLabel:          ["pandoraShower", "emshower"]
 dune10kt_analysistree.POTModuleLabel:             "generator"
 dune10kt_analysistree.SaveCryInfo:                false
 dune10kt_analysistree.SaveGenieInfo:              true
