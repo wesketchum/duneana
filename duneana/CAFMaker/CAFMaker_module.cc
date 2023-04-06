@@ -76,6 +76,10 @@ namespace caf {
 
     private:
       void AddGlobalTreeToFile(TFile* f, SRGlobal& global);
+      void FillTruthInfo(caf::StandardRecord& sr,
+                         std::vector<simb::MCTruth> const& truth,
+                         std::vector<simb::MCFlux> const& flux,
+                         art::Event const& evt) const;
 
       std::string fMVASelectLabel;
       std::string fMVASelectNueLabel;
@@ -212,6 +216,141 @@ namespace caf {
     globalTree->Write();
   }
 
+  void CAFMaker::FillTruthInfo(caf::StandardRecord& sr,
+                               std::vector<simb::MCTruth> const& truth,
+                               std::vector<simb::MCFlux> const& flux,
+                               art::Event const& evt) const
+  {
+    for(size_t i=0; i<truth.size(); i++){
+
+      if(i>1){
+        mf::LogWarning("CAFMaker") << "Skipping MC truth index " << i;
+        continue;
+      }
+
+      sr.isFD   = 1; // always FD
+      sr.isFHC  = 999; // don't know how to get this?
+      sr.isCC   = !(truth[i].GetNeutrino().CCNC());  // ccnc is 0=CC 1=NC
+      sr.nuPDG  = truth[i].GetNeutrino().Nu().PdgCode();
+      sr.nuPDGunosc = flux[i].fntype;
+      sr.mode   = truth[i].GetNeutrino().Mode(); //0=QE/El, 1=RES, 2=DIS, 3=Coherent production; this is different than mode in ND
+      sr.Ev     = truth[i].GetNeutrino().Nu().E();
+      sr.Q2     = truth[i].GetNeutrino().QSqr();
+      sr.W      = truth[i].GetNeutrino().W();
+      sr.X      = truth[i].GetNeutrino().X();
+      sr.Y      = truth[i].GetNeutrino().Y();
+      sr.NuMomX = truth[i].GetNeutrino().Nu().Momentum().X();
+      sr.NuMomY = truth[i].GetNeutrino().Nu().Momentum().Y();
+      sr.NuMomZ = truth[i].GetNeutrino().Nu().Momentum().Z();
+
+      sr.vtx_x  = truth[i].GetNeutrino().Lepton().Vx();
+      sr.vtx_y  = truth[i].GetNeutrino().Lepton().Vy();
+      sr.vtx_z  = truth[i].GetNeutrino().Lepton().Vz();
+
+      //Lepton stuff
+      sr.LepPDG   = truth[i].GetNeutrino().Lepton().PdgCode();
+      sr.LepMomX  = truth[i].GetNeutrino().Lepton().Momentum().X();
+      sr.LepMomY  = truth[i].GetNeutrino().Lepton().Momentum().Y();
+      sr.LepMomZ  = truth[i].GetNeutrino().Lepton().Momentum().Z();
+      sr.LepE     = truth[i].GetNeutrino().Lepton().Momentum().T();
+      sr.LepNuAngle = truth[i].GetNeutrino().Nu().Momentum().Vect().Angle(truth[i].GetNeutrino().Lepton().Momentum().Vect());
+
+      sr.nP     = 0;
+      sr.nN     = 0;
+      sr.nipip  = 0;
+      sr.nipim  = 0;
+      sr.nipi0  = 0;
+      sr.nikp   = 0;
+      sr.nikm   = 0;
+      sr.nik0   = 0;
+      sr.niem   = 0;
+      sr.niother = 0;
+      sr.nNucleus = 0;
+      sr.nUNKNOWN = 0;
+
+      sr.eP = 0.;
+      sr.eN = 0.;
+      sr.ePip = 0.;
+      sr.ePim = 0.;
+      sr.ePi0 = 0.;
+      sr.eOther = 0.;
+
+      for( int p = 0; p < truth[i].NParticles(); p++ ) {
+        if( truth[i].GetParticle(p).StatusCode() == genie::kIStHadronInTheNucleus ) {
+
+          int pdg = truth[i].GetParticle(p).PdgCode();
+          double ke = truth[i].GetParticle(p).E() - truth[i].GetParticle(p).Mass();
+          if     ( pdg == genie::kPdgProton ) {
+            sr.nP++;
+            sr.eP += ke;
+          } else if( pdg == genie::kPdgNeutron ) {
+            sr.nN++;
+            sr.eN += ke;
+          } else if( pdg == genie::kPdgPiP ) {
+            sr.nipip++;
+            sr.ePip += ke;
+          } else if( pdg == genie::kPdgPiM ) {
+            sr.nipim++;
+            sr.ePim += ke;
+          } else if( pdg == genie::kPdgPi0 ) {
+            sr.nipi0++;
+            sr.ePi0 += ke;
+          } else if( pdg == genie::kPdgKP ) {
+            sr.nikp++;
+            sr.eOther += ke;
+          } else if( pdg == genie::kPdgKM ) {
+            sr.nikm++;
+            sr.eOther += ke;
+          } else if( pdg == genie::kPdgK0 || pdg == genie::kPdgAntiK0 || pdg == genie::kPdgK0L || pdg == genie::kPdgK0S ) {
+            sr.nik0++;
+            sr.eOther += ke;
+          } else if( pdg == genie::kPdgGamma ) {
+            sr.niem++;
+            sr.eOther += ke;
+          } else if( genie::pdg::IsHadron(pdg) ) {
+            sr.niother++; // charm mesons, strange and charm baryons, antibaryons, etc.
+            sr.eOther += ke;
+          } else if( genie::pdg::IsIon(pdg) ) {
+            sr.nNucleus++;
+          } else {
+            sr.nUNKNOWN++;
+          }
+
+        }
+      }
+
+      // Reweighting variables
+
+      // Consider
+      //systtools::ScrubUnityEventResponses(er);
+
+      sr.total_xsSyst_cv_wgt = 1;
+
+      for(auto &sp : fSystProviders ) {
+        std::unique_ptr<systtools::EventAndCVResponse> syst_resp = sp->GetEventVariationAndCVResponse(evt);
+        if( !syst_resp ) {
+          std::cout << "[ERROR]: Got nullptr systtools::EventResponse from provider "
+                    << sp->GetFullyQualifiedName();
+          abort();
+        }
+
+        // The iteration order here is the same as how we filled SRGlobal, so
+        // no need to do any work to make sure they align.
+        //
+        // NB this will all go wrong if we ever support more than one MCTruth
+        // per event.
+        for(const std::vector<systtools::VarAndCVResponse>& resp: *syst_resp){
+          for(const systtools::VarAndCVResponse& it: resp){
+            // Need begin/end to convert double to float
+            sr.xsSyst_wgt.emplace_back(it.responses.begin(), it.responses.end());
+            sr.cvwgt.push_back(it.CV_response);
+            sr.total_xsSyst_cv_wgt *= it.CV_response;
+          }
+        }
+      }
+    } // loop through MC truth i
+  }
+
   //------------------------------------------------------------------------------
   void CAFMaker::beginSubRun(const art::SubRun& sr)
   {
@@ -322,156 +461,13 @@ namespace caf {
       }
     }
 
-    std::vector< art::Ptr<simb::MCTruth> > truth;
     auto mct = evt.getHandle< std::vector<simb::MCTruth> >("generator");
-    if ( mct )
-      art::fill_ptr_vector(truth, mct);
-    else
+    if ( !mct ) {
       mf::LogWarning("CAFMaker") << "No MCTruth.";
-
-    std::vector< art::Ptr<simb::MCFlux> > flux;
-    auto mcf = evt.getHandle< std::vector<simb::MCFlux> >("generator");
-    if ( mcf )
-      art::fill_ptr_vector(flux, mcf);
-    else
-      mf::LogWarning("CAFMaker") << "No MCFlux.";
-/*
-    std::vector< art::Ptr<simb::GTruth> > gtru;
-    auto gt = evt.getHandle< std::vector<simb::GTruth> >("generator");
-    if ( gt )
-      art::fill_ptr_vector(gtru, gt);
-    else
-      mf::LogWarning("CAFMaker") << "No GTruth.";
-*/
-
-    for(size_t i=0; i<truth.size(); i++){
-
-      if(i>1){
-        mf::LogWarning("CAFMaker") << "Skipping MC truth index " << i;
-        continue;
-      }
-
-      sr.isFD   = 1; // always FD
-      sr.isFHC  = 999; // don't know how to get this?
-      sr.isCC   = !(truth[i]->GetNeutrino().CCNC());  // ccnc is 0=CC 1=NC
-      sr.nuPDG  = truth[i]->GetNeutrino().Nu().PdgCode();
-      sr.nuPDGunosc = flux[i]->fntype;
-      sr.mode   = truth[i]->GetNeutrino().Mode(); //0=QE/El, 1=RES, 2=DIS, 3=Coherent production; this is different than mode in ND
-      sr.Ev     = truth[i]->GetNeutrino().Nu().E();
-      sr.Q2     = truth[i]->GetNeutrino().QSqr();
-      sr.W      = truth[i]->GetNeutrino().W();
-      sr.X      = truth[i]->GetNeutrino().X();
-      sr.Y      = truth[i]->GetNeutrino().Y();
-      sr.NuMomX = truth[i]->GetNeutrino().Nu().Momentum().X();
-      sr.NuMomY = truth[i]->GetNeutrino().Nu().Momentum().Y();
-      sr.NuMomZ = truth[i]->GetNeutrino().Nu().Momentum().Z();
-
-      sr.vtx_x  = truth[i]->GetNeutrino().Lepton().Vx();
-      sr.vtx_y  = truth[i]->GetNeutrino().Lepton().Vy();
-      sr.vtx_z  = truth[i]->GetNeutrino().Lepton().Vz();
-
-      //Lepton stuff
-      sr.LepPDG   = truth[i]->GetNeutrino().Lepton().PdgCode();
-      sr.LepMomX  = truth[i]->GetNeutrino().Lepton().Momentum().X();
-      sr.LepMomY  = truth[i]->GetNeutrino().Lepton().Momentum().Y();
-      sr.LepMomZ  = truth[i]->GetNeutrino().Lepton().Momentum().Z();
-      sr.LepE     = truth[i]->GetNeutrino().Lepton().Momentum().T();
-      sr.LepNuAngle = truth[i]->GetNeutrino().Nu().Momentum().Vect().Angle(truth[i]->GetNeutrino().Lepton().Momentum().Vect());
-
-      sr.nP     = 0;
-      sr.nN     = 0;
-      sr.nipip  = 0;
-      sr.nipim  = 0;
-      sr.nipi0  = 0;
-      sr.nikp   = 0;
-      sr.nikm   = 0;
-      sr.nik0   = 0;
-      sr.niem   = 0;
-      sr.niother = 0;
-      sr.nNucleus = 0;
-      sr.nUNKNOWN = 0;
-
-      sr.eP = 0.;
-      sr.eN = 0.;
-      sr.ePip = 0.;
-      sr.ePim = 0.;
-      sr.ePi0 = 0.;
-      sr.eOther = 0.;
-
-      for( int p = 0; p < truth[i]->NParticles(); p++ ) {
-        if( truth[i]->GetParticle(p).StatusCode() == genie::kIStHadronInTheNucleus ) {
-
-          int pdg = truth[i]->GetParticle(p).PdgCode();
-          double ke = truth[i]->GetParticle(p).E() - truth[i]->GetParticle(p).Mass();
-          if     ( pdg == genie::kPdgProton ) {
-            sr.nP++;
-            sr.eP += ke;
-          } else if( pdg == genie::kPdgNeutron ) {
-            sr.nN++;
-            sr.eN += ke;
-          } else if( pdg == genie::kPdgPiP ) {
-            sr.nipip++;
-            sr.ePip += ke;
-          } else if( pdg == genie::kPdgPiM ) {
-            sr.nipim++;
-            sr.ePim += ke;
-          } else if( pdg == genie::kPdgPi0 ) {
-            sr.nipi0++;
-            sr.ePi0 += ke;
-          } else if( pdg == genie::kPdgKP ) {
-            sr.nikp++;
-            sr.eOther += ke;
-          } else if( pdg == genie::kPdgKM ) {
-            sr.nikm++;
-            sr.eOther += ke;
-          } else if( pdg == genie::kPdgK0 || pdg == genie::kPdgAntiK0 || pdg == genie::kPdgK0L || pdg == genie::kPdgK0S ) {
-            sr.nik0++;
-            sr.eOther += ke;
-          } else if( pdg == genie::kPdgGamma ) {
-            sr.niem++;
-            sr.eOther += ke;
-          } else if( genie::pdg::IsHadron(pdg) ) {
-            sr.niother++; // charm mesons, strange and charm baryons, antibaryons, etc.
-            sr.eOther += ke;
-          } else if( genie::pdg::IsIon(pdg) ) {
-            sr.nNucleus++;
-          } else {
-            sr.nUNKNOWN++;
-          }
-
         }
+    else if ( !mct->empty() ) {
+      FillTruthInfo(sr, *mct, evt.getProduct<std::vector<simb::MCFlux> >("generator"), evt);
       }
-
-      // Reweighting variables
-
-      // Consider
-      //systtools::ScrubUnityEventResponses(er);
-
-      sr.total_xsSyst_cv_wgt = 1;
-
-      for(auto &sp : fSystProviders ) {
-        std::unique_ptr<systtools::EventAndCVResponse> syst_resp = sp->GetEventVariationAndCVResponse(evt);
-        if( !syst_resp ) {
-          std::cout << "[ERROR]: Got nullptr systtools::EventResponse from provider "
-                    << sp->GetFullyQualifiedName();
-          abort();
-        }
-
-        // The iteration order here is the same as how we filled SRGlobal, so
-        // no need to do any work to make sure they align.
-        //
-        // NB this will all go wrong if we ever support more than one MCTruth
-        // per event.
-        for(const std::vector<systtools::VarAndCVResponse>& resp: *syst_resp){
-          for(const systtools::VarAndCVResponse& it: resp){
-            // Need begin/end to convert double to float
-            sr.xsSyst_wgt.emplace_back(it.responses.begin(), it.responses.end());
-            sr.cvwgt.push_back(it.CV_response);
-            sr.total_xsSyst_cv_wgt *= it.CV_response;
-          }
-        }
-      }
-    } // loop through MC truth i
 
     if(fTree){
       fTree->Fill();
