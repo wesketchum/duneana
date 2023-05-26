@@ -91,23 +91,21 @@ void pdsp::HitAnaPDSP::analyze(art::Event const& e)
   pdg.clear();
 
    // Reconstruciton information
-  std::vector < art::Ptr < recob::Hit > > hitList;
   auto hitListHandle = e.getHandle < std::vector < recob::Hit > >(fHitModuleLabel);
-  if (hitListHandle) {
-    art::fill_ptr_vector(hitList, hitListHandle);
+  if (!hitListHandle) {
+    return;
   }
-  else return;
 
-  for (auto const & hit : hitList){
-    channel.push_back(hit->Channel());
-    tpc.push_back(hit->WireID().TPC);
-    plane.push_back(hit->WireID().Plane);
-    wire.push_back(hit->WireID().Wire);
-    charge.push_back(hit->Integral());
-    peakt.push_back(hit->PeakTime());
-    rms.push_back(hit->RMS());
-    startt.push_back(hit->StartTick());
-    endt.push_back(hit->EndTick());
+  for (auto const & hit : *hitListHandle){
+    channel.push_back(hit.Channel());
+    tpc.push_back(hit.WireID().TPC);
+    plane.push_back(hit.WireID().Plane);
+    wire.push_back(hit.WireID().Wire);
+    charge.push_back(hit.Integral());
+    peakt.push_back(hit.PeakTime());
+    rms.push_back(hit.RMS());
+    startt.push_back(hit.StartTick());
+    endt.push_back(hit.EndTick());
   }
 
   if (!channel.empty()) ftree->Fill();

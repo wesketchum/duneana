@@ -4690,15 +4690,10 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
             const art::Ptr<simb::MCTruth> mc = pi_serv->TrackIdToMCTruth_P(TrackerData.trkg4id[iTrk]);
             TrackerData.trkorig[iTrk] = mc->Origin();
           }
-          if (allHits.size()){
-            std::vector<art::Ptr<recob::Hit> > all_hits;
-            art::Handle<std::vector<recob::Hit> > hithandle;
-            float totenergy = 0;
-            if (evt.get(allHits[0].id(), hithandle)){
-              art::fill_ptr_vector(all_hits, hithandle);
-              for(size_t h = 0; h < all_hits.size(); ++h){
-
-                art::Ptr<recob::Hit> hit = all_hits[h];
+          if (!allHits.empty() and allHits[0]) {
+            float totenergy = 0.;
+            auto const& all_hits = allHits[0].parentAs<std::vector>();
+            for(recob::Hit const& hit : all_hits) {
                 std::vector<sim::IDE*> ides;
                 //bt_serv->HitToSimIDEs(hit,ides);
                 std::vector<sim::TrackIDE> eveIDs = bt_serv->HitToEveTrackIDEs(clockData, hit);
@@ -4707,7 +4702,6 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
                   //std::cout<<h<<" "<<e<<" "<<eveIDs[e].trackID<<" "<<eveIDs[e].energy<<" "<<eveIDs[e].energyFrac<<std::endl;
                   if (eveIDs[e].trackID==TrackerData.trkg4id[iTrk]) totenergy += eveIDs[e].energy;
                 }
-              }
             }
             if (totenergy) TrackerData.trkcompleteness[iTrk] = maxe/totenergy;
           }
