@@ -405,7 +405,7 @@ void SolarNuAna::analyze(art::Event const & evt)
   for ( int i = 0; i < int(flashlist.size()); i++ ){
 
     recob::OpFlash TheFlash = *flashlist[i];
-    if (i%10 == 0) PrintInColor("Flash Time = " + str(TheFlash.Time()), GetColor("red"));
+    // if (i%10 == 0) PrintInColor("Flash Time = " + str(TheFlash.Time()), GetColor("red"));
     std::vector< art::Ptr< recob::OpHit > > matchedHits = OpAssns.at(i);
     if (fDebug) std::cout << "Assigning OpHit to Flash" << std::endl;
     // Calculate the total PE of the flash and the time of the ophit with the highest PE 
