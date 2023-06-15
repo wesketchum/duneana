@@ -91,7 +91,7 @@ private:
   TTree* fSolarNuAnaTree;
   TTree* fMCTruthTree;
   std::string MGenLabel;
-  int Run,SubRun,Event,Flag,MNHit,MGen,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
+  int Run,SubRun,Event,Flag,MNHit,MGen,MTPC,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
   float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP;
   std::vector<int> MAdjClGen,MAdjClMainID,TPart,MarleyPDGList,MarleyIDList,MarleyParentIDList,MAdjClMainPDG;
   std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainX,MMarleyFrac,MGenFrac;
@@ -203,6 +203,7 @@ void SolarNuAna::beginJob(){
   fSolarNuAnaTree -> Branch("Time",             &MTime,            "ColTime/F");       // Main cluster time [ticks]
   fSolarNuAnaTree -> Branch("Charge",           &MChrg,            "ColCharge/F");     // Main cluster charge [ADC*ticks]
   fSolarNuAnaTree -> Branch("NHits",            &MNHit,            "ColNHits/I");      // Main cluster #hits
+  fSolarNuAnaTree -> Branch("TPC",              &MTPC,             "ColTPC/I");        // Main cluster TPC
   fSolarNuAnaTree -> Branch("Ind0TPC",          &MInd0TPC,         "Ind0TPC/I");       // Main cluster ind0 TPC
   fSolarNuAnaTree -> Branch("Ind1TPC",          &MInd1TPC,         "Ind1TPC/I");       // Main cluster ind1 TPC  
   fSolarNuAnaTree -> Branch("Ind0NHits",        &MInd0NHits,       "Ind0NHits/I");     // Main cluster ind0 Hits
@@ -588,7 +589,7 @@ void SolarNuAna::analyze(art::Event const & evt)
   
   std::cout << std::endl;//-------------------------------------------------------------------- Cluster Matching -------------------------------------------------------------------------// 
   std::vector<std::vector<float>> MVecGenFrac = {};
-  std::vector<int>   MVecNHit  = {}, MVecGen    = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
+  std::vector<int>   MVecNHit  = {}, MVecGen    = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecTPC = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
   std::vector<float> MVecTime  = {}, MVecChrg   = {}, MVecInd0MaxHit = {}, MVecInd1MaxHit = {}, MVecInd0dT = {}, MVecInd1dT = {};
   std::vector<float> MVecInd0RecoY = {}, MVecInd1RecoY = {}, MVecRecY = {}, MVecRecZ = {};
   std::vector<float> MVecFracE = {}, MVecFracGa = {}, MVecFracNe = {}, MVecFracRest = {}, MVecPur = {};
@@ -636,27 +637,39 @@ void SolarNuAna::analyze(art::Event const & evt)
     
     //--------------------------------------------------------- Export Matched cluster vectors ------------------------------------------------------------------// 
     if (match == true){
-      MVecTime.push_back(ClT[2][ii]);
+      // Cluster Charge
       MVecChrg.push_back(ClTotChrg[2][ii]);
+      // Cluster Hits
       MVecNHit.push_back(ClNHits[2][ii]);
-      MVecInd0TPC.push_back(ClTPC[0][ii]);
-      MVecInd1TPC.push_back(ClTPC[1][ii]);
-      MVecInd0dT.push_back(ind0clustdT);
-      MVecInd1dT.push_back(ind1clustdT);
-      MVecInd0RecoY.push_back(ind0clustY);
-      MVecInd1RecoY.push_back(ind1clustY);
-      MVecInd0MaxHit.push_back(ind0clustMaxHit);
-      MVecInd1MaxHit.push_back(ind1clustMaxHit);
       MVecInd0NHits.push_back(ind0clustNHits);
       MVecInd1NHits.push_back(ind1clustNHits);
+      // Cluster TPC
+      MVecTPC.push_back(ClTPC[2][ii]);
+      MVecInd0TPC.push_back(ClTPC[0][ii]);
+      MVecInd1TPC.push_back(ClTPC[1][ii]);
+      // Cluster Time
+      MVecTime.push_back(ClT[2][ii]);
+      MVecInd0dT.push_back(ind0clustdT);
+      MVecInd1dT.push_back(ind1clustdT);
+      // Cluster RecoY
+      MVecInd0RecoY.push_back(ind0clustY);
+      MVecInd1RecoY.push_back(ind1clustY);
+      // Cluster RecoZ	    
       MVecRecZ.push_back(ClZ[2][ii]);
+      // Cluster MaxChargeHit
+      MVecInd0MaxHit.push_back(ind0clustMaxHit);
+      MVecInd1MaxHit.push_back(ind1clustMaxHit);
+
+      // Cluster Marley Fractions
       MVecFracE.push_back(ClFracE[2][ii]);
       MVecFracGa.push_back(ClFracGa[2][ii]);
       MVecFracNe.push_back(ClFracNe[2][ii]);
       MVecFracRest.push_back(ClFracRest[2][ii]);
+      // Cluster Marley Purity
       MVecPur.push_back(ClPur[2][ii]);
-      MVecGen.push_back(ClGen[2][ii]);
+      // Cluster Gen and GenFraction
       MVecMainID.push_back(ClMainID[2][ii]);
+      MVecGen.push_back(ClGen[2][ii]);
       MVecGenFrac.push_back(ClGenPur[2][ii]);
       
       float buffer = 1;
@@ -748,8 +761,11 @@ void SolarNuAna::analyze(art::Event const & evt)
       MTime =       MVecTime[i];   
       MChrg =       MVecChrg[i];   
       MNHit =       MVecNHit[i];
+      // Cluster TPC
+      MTPC =        MVecTPC[i]
       MInd0TPC =    MVecInd0TPC[i];
       MInd1TPC =    MVecInd1TPC[i];
+      // Cluster MaxChargeHit
       MInd0MaxHit = MVecInd0MaxHit[i];   
       MInd1MaxHit = MVecInd1MaxHit[i];
       MInd0NHits =  MVecInd0NHits[i];   
