@@ -382,9 +382,9 @@ void SolarNuAna::analyze(art::Event const & evt)
         // else {ClPartTrackIDs[3].push_back((*part)->TrackId()); std::cout << "TrackID " << (*part)->TrackId() << " going to rest" << std::endl;}
       }
     }
-    fMCTruthTree->Fill();
   }
   else{std::cout << "No MARLEY MCTruths found." << std::endl;}
+  fMCTruthTree->Fill();
   
   std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
   //------------------------------------------------------------------- Optical Flash Analysis --------------------------------------------------------------------// 
