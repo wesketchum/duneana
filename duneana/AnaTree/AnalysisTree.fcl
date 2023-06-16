@@ -11,6 +11,7 @@ dune35t_analysistree:
  CryGenModuleLabel:           "generator"
  ProtoGenModuleLabel:         ""
  G4ModuleLabel:               "largeant"
+ SimChannelLabel:             "largeant" # For vertical drift, use `elecDrift`
  TrackModuleLabel:            [ "pmtrack", "pmtrackdc", "pandoraTrack", "pandoraTrackdc" ]
  VertexModuleLabel:           [ "linecluster", "lineclusterdc", "pmtrack", "pmtrackdc", "pandora", "pandoradc" ]
  PandoraNuVertexModuleLabel:  ""

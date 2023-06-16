@@ -1251,6 +1251,7 @@ namespace dune {
     std::string fDigitModuleLabel;
     std::string fHitsModuleLabel;
     std::string fLArG4ModuleLabel;
+    std::string fSimChannelLabel;
     std::string fCalDataModuleLabel;
     std::string fGenieGenModuleLabel;
     std::string fCryGenModuleLabel;
@@ -3335,6 +3336,7 @@ dune::AnalysisTree::AnalysisTree(fhicl::ParameterSet const& pset) :
   fDigitModuleLabel         (pset.get< std::string >("DigitModuleLabel")        ),
   fHitsModuleLabel          (pset.get< std::string >("HitsModuleLabel")         ),
   fLArG4ModuleLabel         (pset.get< std::string >("LArGeantModuleLabel")     ),
+  fSimChannelLabel          (pset.get< std::string >("SimChannelLabel")     ),
   fCalDataModuleLabel       (pset.get< std::string >("CalDataModuleLabel")      ),
   fGenieGenModuleLabel      (pset.get< std::string >("GenieGenModuleLabel")     ),
   fCryGenModuleLabel        (pset.get< std::string >("CryGenModuleLabel")       ),
@@ -3833,7 +3835,7 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
   std::vector<const sim::SimChannel*> fSimChannels;
   if (isMC && fSaveGeantInfo)
-    evt.getView(fLArG4ModuleLabel, fSimChannels);
+    evt.getView(fSimChannelLabel, fSimChannels);
 
   fData->run = evt.run();
   fData->subrun = evt.subRun();
