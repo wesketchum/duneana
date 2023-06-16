@@ -83,6 +83,8 @@
 
 #include "lardata/ArtDataHelper/MVAReader.h"
 
+#include "nusimdata/SimulationBase/GTruth.h"
+
 #include <cstddef> // std::ptrdiff_t
 #include <cstring> // std::memcpy()
 #include <vector>
@@ -642,6 +644,7 @@ namespace dune {
     Int_t     nuPDG_truth[kMaxTruth];     //neutrino PDG code
     Int_t     ccnc_truth[kMaxTruth];      //0=CC 1=NC
     Int_t     mode_truth[kMaxTruth];      //0=QE/El, 1=RES, 2=DIS, 3=Coherent production
+    Float_t   nuWeight_truth[kMaxTruth];     //neutrino weight from generator
     Float_t  enu_truth[kMaxTruth];       //true neutrino energy
     Float_t  Q2_truth[kMaxTruth];        //Momentum transfer squared
     Float_t  W_truth[kMaxTruth];         //hadronic invariant mass
@@ -3008,6 +3011,7 @@ void dune::AnalysisTreeDataStruct::SetAddresses(
     CreateBranch("nuPDG_truth",nuPDG_truth,"nuPDG_truth[mcevts_truth]/I");
     CreateBranch("ccnc_truth",ccnc_truth,"ccnc_truth[mcevts_truth]/I");
     CreateBranch("mode_truth",mode_truth,"mode_truth[mcevts_truth]/I");
+    CreateBranch("nuWeight_truth",nuWeight_truth,"nuWeight_truth[mcevts_truth]/F");
     CreateBranch("enu_truth",enu_truth,"enu_truth[mcevts_truth]/F");
     CreateBranch("Q2_truth",Q2_truth,"Q2_truth[mcevts_truth]/F");
     CreateBranch("W_truth",W_truth,"W_truth[mcevts_truth]/F");
@@ -4863,6 +4867,11 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
               fData->lep_dcosz_truth[neutrino_i] = mclist[iList]->GetNeutrino().Lepton().Pz()/mclist[iList]->GetNeutrino().Lepton().P();
             }
 
+            auto gt = evt.getHandle< std::vector<simb::GTruth> >("generator");
+            if ( gt ){
+              auto gtruth = (*gt)[0];
+              fData->nuWeight_truth[neutrino_i] = gtruth.fweight;;
+            }
             //flux information
             //
             // Double-check that a simb::MCFlux object is associated with the
