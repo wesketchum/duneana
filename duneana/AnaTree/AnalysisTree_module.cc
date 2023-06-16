@@ -4251,7 +4251,9 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
       // Set the daughter IDs.
       std::vector<size_t> daughterIDs = pfparticlelist[i]->Daughters();
 
-      for (size_t j = 0; j < daughterIDs.size(); ++j)
+      if (daughterIDs.size() > kMaxNDaughtersPerPFP)
+        std::cerr << "Warning: there were " << daughterIDs.size() << " reconstructed PFParticle daughters; only the first " << kMaxNDaughtersPerPFP << " being stored in tree" << std::endl;
+      for (size_t j = 0; j < std::min(daughterIDs.size(), (size_t)kMaxNDaughtersPerPFP); ++j)
         PFParticleData.pfp_daughterIDs[i][j] = daughterIDs[j];
 
       // Set the vertex ID.
@@ -4319,7 +4321,9 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
           lar_pandora::ClusterVector pfParticleClusters = clusterMapIter->second;
           PFParticleData.pfp_numClusters[i] = pfParticleClusters.size();
 
-          for (size_t j = 0; j < pfParticleClusters.size(); ++j)
+          if (pfParticleClusters.size() > kMaxNClustersPerPFP)
+            std::cerr << "Warning: there were " << pfParticleClusters.size() << " reconstructed PFParticle clusters; only the first " << kMaxNClustersPerPFP << " being stored in tree" << std::endl;
+          for (size_t j = 0; j < std::min(pfParticleClusters.size(), (size_t)kMaxNClustersPerPFP); ++j)
             PFParticleData.pfp_clusterIDs[i][j] = pfParticleClusters[j]->ID();
       }
       //else
