@@ -4233,12 +4233,12 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
     // Get a PFParticle-to-track map.
     lar_pandora::TrackVector allPfParticleTracks;
     lar_pandora::PFParticlesToTracks pfParticleToTrackMap;
-    lar_pandora::LArPandoraHelper::CollectTracks(evt, fPFParticleModuleLabel, allPfParticleTracks, pfParticleToTrackMap);
+    lar_pandora::LArPandoraHelper::CollectTracks(evt, fTrackModuleLabel[0], allPfParticleTracks, pfParticleToTrackMap);
 
     // Get a PFParticle-to-shower map.
     lar_pandora::ShowerVector allPfParticleShowers;
     lar_pandora::PFParticlesToShowers pfParticleToShowerMap;
-    lar_pandora::LArPandoraHelper::CollectShowers(evt, fPFParticleModuleLabel, allPfParticleShowers, pfParticleToShowerMap);
+    lar_pandora::LArPandoraHelper::CollectShowers(evt, fShowerModuleLabel[0], allPfParticleShowers, pfParticleToShowerMap);
 
     for (size_t i = 0; i < NPFParticles && i < PFParticleData.GetMaxPFParticles() ; ++i){
       PFParticleData.pfp_selfID[i] = pfparticlelist[i]->Self();
