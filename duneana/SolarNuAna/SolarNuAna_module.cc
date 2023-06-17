@@ -714,6 +714,7 @@ void SolarNuAna::analyze(art::Event const & evt)
       else {ResultColor = "yellow";PrintInColor(" - Cluster is NOT close to neutrino vertex!",GetColor(ResultColor));}
 
       PrintInColor(" - Cluster " + str(MVecMainID[i]) + " Gen " + str(MVecGen[i]) + " Purity " + str(MVecPur[i]) + " Hits " + str(MVecNHit[i]), GetColor(ResultColor));
+      std::cout << "Cluster " << MVecMainID[i] << " Gen " << MVecGen[i] << " Purity " << MVecPur[i] << " Hits " << MVecNHit[i] << std::endl;
       PrintInColor(" - RecoY, Z (" + str(MVecRecY[i]) + ", " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
 
       // Loop over collection plane clusters to find adjacent clusters with distance < fAdjClusterRad and time < fAdjClusterTime
@@ -762,7 +763,7 @@ void SolarNuAna::analyze(art::Event const & evt)
       MChrg =       MVecChrg[i];   
       MNHit =       MVecNHit[i];
       // Cluster TPC
-      MTPC =        MVecTPC[i]
+      MTPC =        MVecTPC[i];
       MInd0TPC =    MVecInd0TPC[i];
       MInd1TPC =    MVecInd1TPC[i];
       // Cluster MaxChargeHit
