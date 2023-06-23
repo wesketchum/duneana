@@ -466,10 +466,10 @@ void SolarNuAna::analyze(art::Event const & evt)
   //-------------------------------------------------------------- Cluster creation and analysis ------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Now calculate the clusters ...
-  CalcAdjHits( ColHits0,Clusters0,hAdjHits,hAdjHitsADCInt,false);
-  CalcAdjHits( ColHits1,Clusters1,hAdjHits,hAdjHitsADCInt,false);
-  CalcAdjHits( ColHits2,Clusters2,hAdjHits,hAdjHitsADCInt,false);
-  CalcAdjHits( ColHits3,Clusters3,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits0,Clusters0,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits1,Clusters1,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits2,Clusters2,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits3,Clusters3,hAdjHits,hAdjHitsADCInt,false);
 
   std::cout << "# Clusters from the hits = " << Clusters0.size() << ", " << Clusters1.size() << ", " << Clusters2.size() << ", " << Clusters3.size() << std::endl;
   
@@ -594,25 +594,26 @@ void SolarNuAna::analyze(art::Event const & evt)
   std::vector<float> MVecInd0RecoY = {}, MVecInd1RecoY = {}, MVecRecY = {}, MVecRecZ = {};
   std::vector<float> MVecFracE = {}, MVecFracGa = {}, MVecFracNe = {}, MVecFracRest = {}, MVecPur = {};
 
-  for (int ii = 0; ii < int(AllPlaneClusters[2].size()); ii++){    
+  for (int ii = 0; ii < int(AllPlaneClusters[2].size()); ii++){
+    // std::cout << "Evaluating cluster " << ii << "out of " << int(AllPlaneClusters[2].size()) << std::endl;    
     bool match = false;
     int ind0clustNHits = 0, ind1clustNHits = 0;
+    int ind0clustTPC = 0, ind1clustTPC = 0;
     double ind0clustY = -1e6, ind1clustY = -1e6, ind0clustMaxHit = 0, ind1clustMaxHit = 0;
     double ind0clustdT = fClusterMatchTime, ind1clustdT = fClusterMatchTime;
     // std::cout << "Test" << std::endl;
     if (!AllPlaneClusters[2][ii].empty()){
-      if (fDebug) std::cout << "***Evaluating main cluster " << ii << " with charge " << ClTotChrg[2][ii] << "This cluster's purity is " << ClPur[2][ii]*100 << "%" << std::endl;
+      if (fDebug) std::cout << "***Evaluating main cluster " << ii << " for size " <<  AllPlaneClusters[2][ii].size() << std::endl;
       if (fDebug) std::cout << "This cluster's position is (" << ClY[2][ii] << ", " << ClZ[2][ii] << ") and its time is " << ClT[2][ii] << std::endl;
 
       if (!AllPlaneClusters[0].empty()){
         for (int jj = 0; jj < int(AllPlaneClusters[0].size()); jj++){
-          if (fDebug) std::cout << "Evaluating cluster " << jj << " from plane " << 0 << " with charge " << ClTotChrg[0][jj] << "This cluster's purity is " << ClPur[0][jj]*100 << "%" << std::endl;
-          if (fDebug) std::cout << "This cluster's position is (" << ClY[0][jj] << ", " << ClZ[0][jj] << ") and its time is " << ClT[0][jj] << std::endl;
           if (abs(ClT[2][ii] - ClT[0][jj]) < fClusterMatchTime && abs(fGoalInd0MatchTime - abs(ClT[2][ii] - ClT[0][jj])) < abs(fGoalInd0MatchTime - ind0clustdT)){
             ind0clustY = ClY[0][jj] + (ClZ[2][ii] - ClZ[0][jj])/(Cldzdy[0][jj]);
             ind0clustdT = abs(ClT[2][ii] - ClT[0][jj]);
             ind0clustNHits = int(AllPlaneClusters[0][jj].size());
             ind0clustMaxHit = ClMaxChrg[0][jj];
+            ind0clustTPC = ClTPC[0][jj];
             if (ind0clustY > -fMaxDetSizeY && ind0clustY < fMaxDetSizeY){match = true;}
             if (fDebug) std::cout << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj] << std::endl;
             if (fDebug) std::cout << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii] << std::endl;  
@@ -626,6 +627,7 @@ void SolarNuAna::analyze(art::Event const & evt)
             ind1clustdT = abs(ClT[2][ii] - ClT[1][zz]);
             ind1clustNHits = int(AllPlaneClusters[1][zz].size());
             ind1clustMaxHit = ClMaxChrg[1][zz];
+            ind1clustTPC = ClTPC[1][zz];
             if (ind1clustY > -fMaxDetSizeY && ind1clustY < fMaxDetSizeY){match = true;}
             if (fDebug) std::cout << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz] << std::endl;
             if (fDebug) std::cout << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii] << std::endl;
@@ -645,8 +647,8 @@ void SolarNuAna::analyze(art::Event const & evt)
       MVecInd1NHits.push_back(ind1clustNHits);
       // Cluster TPC
       MVecTPC.push_back(ClTPC[2][ii]);
-      MVecInd0TPC.push_back(ClTPC[0][ii]);
-      MVecInd1TPC.push_back(ClTPC[1][ii]);
+      MVecInd0TPC.push_back(ind0clustTPC);
+      MVecInd1TPC.push_back(ind1clustTPC);
       // Cluster Time
       MVecTime.push_back(ClT[2][ii]);
       MVecInd0dT.push_back(ind0clustdT);
@@ -685,7 +687,7 @@ void SolarNuAna::analyze(art::Event const & evt)
       else{
         if (fDebug) std::cout << "RECO OUTSIDE OF DETECTOR" << std::endl;
         MVecRecY.push_back((ind0clustY+ind1clustY)/2); 
-        if (ClGen[2][ii] == 1){PrintInColor("Marley cluster recon structed outside of detector volume! RecoY = " + str((ind0clustY+ind1clustY)/2), GetColor("red"));}
+        if (ClGen[2][ii] == 1){PrintInColor("Marley cluster reconstructed outside of detector volume! RecoY = " + str((ind0clustY+ind1clustY)/2), GetColor("red"));}
       }
 
       // Print in color if the cluster is matched
@@ -714,7 +716,6 @@ void SolarNuAna::analyze(art::Event const & evt)
       else {ResultColor = "yellow";PrintInColor(" - Cluster is NOT close to neutrino vertex!",GetColor(ResultColor));}
 
       PrintInColor(" - Cluster " + str(MVecMainID[i]) + " Gen " + str(MVecGen[i]) + " Purity " + str(MVecPur[i]) + " Hits " + str(MVecNHit[i]), GetColor(ResultColor));
-      std::cout << "Cluster " << MVecMainID[i] << " Gen " << MVecGen[i] << " Purity " << MVecPur[i] << " Hits " << MVecNHit[i] << std::endl;
       PrintInColor(" - RecoY, Z (" + str(MVecRecY[i]) + ", " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
 
       // Loop over collection plane clusters to find adjacent clusters with distance < fAdjClusterRad and time < fAdjClusterTime
@@ -732,8 +733,14 @@ void SolarNuAna::analyze(art::Event const & evt)
           if (MVecMainID[j] != 0){
             const simb::MCParticle *MAdjClTruth;
             MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
-            MAdjClMainX.push_back(MAdjClTruth->Vx());
-            MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());
+            if (MAdjClTruth == 0) {
+              MAdjClMainX.push_back(-1e6);
+              MAdjClMainPDG.push_back(0);          
+            }
+            else{
+              MAdjClMainX.push_back(MAdjClTruth->Vx());
+              MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
+            }
           }
           else{
             MAdjClMainX.push_back(-1e6);
@@ -784,17 +791,29 @@ void SolarNuAna::analyze(art::Event const & evt)
       if (MVecMainID[i] != 0){
         const simb::MCParticle *MClTruth;
         MClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[i]);
-        MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
-        MMainPDG =    MClTruth->PdgCode();
-        // PrintInColor("MClTruth->Mother()"+str(MClTruth->Mother()),GetColor("blue"));
+        if (MClTruth == 0){
+          MMainVertex = {-1e6,-1e6,-1e6};
+          MMainPDG =    0;
+        }
+        else{
+          MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
+          MMainPDG =    MClTruth->PdgCode();
+        }
         
         // If exists add the parent information
         if(MClTruth->Mother() != 0){ // Check if the particle has a parent
           const simb::MCParticle *MClParentTruth;
           MClParentTruth =    pi_serv->TrackIdToParticle_P(MClTruth->Mother());
-          MMainParentVertex = {MClParentTruth->Vx(),MClParentTruth->Vy(),MClParentTruth->Vz()};
-          MMainParentPDG =    MClParentTruth->PdgCode();
+          if (MClParentTruth == 0){
+            MMainParentVertex = {-1e6,-1e6,-1e6};
+            MMainParentPDG =    0;
+          }
+          else{
+            MMainParentVertex = {MClParentTruth->Vx(),MClParentTruth->Vy(),MClParentTruth->Vz()};
+            MMainParentPDG =    MClParentTruth->PdgCode();
+          }
         }
+
         else{ // If not set the parent information to -1e6
           MMainParentVertex = {-1e6,-1e6,-1e6};
           MMainParentPDG =    0;

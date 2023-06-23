@@ -1,6 +1,4 @@
-// solarnuana_hd_job.fcl
-//
-// Run SolarNuAna on the output of offline hit finders
+# Run LowE on the output of offline reco data
 
 #include "SolarNuAna.fcl"
 #include "services_dune.fcl"
