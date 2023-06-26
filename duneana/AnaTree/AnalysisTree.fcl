@@ -80,6 +80,7 @@ protodune_analysistree_data.SaveProtoInfo: false
 
 dune10kt_analysistree: @local::dune35t_analysistree
 dune10kt_analysistree.PandoraNuVertexModuleLabel: "pandora"
+dune10kt_analysistree.LArGeantModuleLabel: "tpcrawdecoder:simpleSC"
 dune10kt_analysistree.TrackModuleLabel: [ "pmtrack", "pmtracktc", "pandoraTrack", "pmtrajfit" ]
 dune10kt_analysistree.CalorimetryModuleLabel: [ "pmtrackcalo", "pmtracktccalo", "pandoracalo", "pmtrajfitcalo" ]
 dune10kt_analysistree.ParticleIDModuleLabel:       [ "pmtrackpid", "pmtracktcpid", "pandorapid", "pmtrajfitpid" ]
