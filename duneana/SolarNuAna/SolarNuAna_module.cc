@@ -381,8 +381,8 @@ void SolarNuAna::analyze(art::Event const & evt)
           auto x_f = v4_f.X();auto y_f = v4_f.Y();auto z_f = v4_f.Z();
           avX = x_f; avY = y_f; avZ = z_f;
           ClPartTrackIDs[0].push_back((*part)->TrackId());
-          if (fDebug) std::cout << "\nMC Electron truth position x = " << avX << ", y = " << avY << ", z = " << avZ << std::endl;
-          if (fDebug) std::cout << "Initial KE " << (*part)->E()-(*part)->Mass() << std::endl;
+          mf::LogDebug("DAQSimAna") << "\nMC Electron truth position x = " << avX << ", y = " << avY << ", z = " << avZ;
+          mf::LogDebug("DAQSimAna") << "Initial KE " << (*part)->E()-(*part)->Mass();
         }
         if ((*part)->PdgCode()==22){ClPartTrackIDs[1].push_back((*part)->TrackId());} // Gammas
         if ((*part)->PdgCode()==2112){ClPartTrackIDs[2].push_back((*part)->TrackId());} // Neutrons
@@ -415,7 +415,7 @@ void SolarNuAna::analyze(art::Event const & evt)
     recob::OpFlash TheFlash = *flashlist[i];
     // if (i%10 == 0) PrintInColor("Flash Time = " + str(TheFlash.Time()), GetColor("red"));
     std::vector< art::Ptr< recob::OpHit > > matchedHits = OpAssns.at(i);
-    if (fDebug) std::cout << "Assigning OpHit to Flash" << std::endl;
+    mf::LogDebug("DAQSimAna") << "Assigning OpHit to Flash";
     // Calculate the total PE of the flash and the time of the ophit with the highest PE 
     double totPE = 0; double MaxHitPE = 0;
     float OpHitT, OpHitPE;
@@ -429,12 +429,12 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
     }
 
-    if (fDebug) std::cout << "Evaluating Flash purity" << std::endl;
+    mf::LogDebug("DAQSimAna") << "Evaluating Flash purity";
     // Calculate the flash purity
     int TerminalOutput = supress_stdout();
     double OpFlashPur = pbt->OpHitCollectionPurity(signal_trackids, matchedHits);
     resume_stdout(TerminalOutput);
-    if (fDebug) std::cout << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT << std::endl;
+    mf::LogDebug("DAQSimAna") << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT;
 
     // Calculate the flash purity, only for the Marley events
     if (MaxHitPE/totPE < fAdjOpFlashMaxPECut && totPE > fAdjOpFlashMinPECut){
@@ -447,7 +447,9 @@ void SolarNuAna::analyze(art::Event const & evt)
       OpFlashDeltaT.push_back(TheFlash.TimeWidth());
       OpFlashNHit.push_back(matchedHits.size());
     }
-    if (fDebug && abs(OpHitT) < 30) std::cout << "OpFlash PE (max/tot) " << MaxHitPE << "/" << TheFlash.TotalPE() << " with purity " << OpFlashPur << " time " << TheFlash.Time() << std::endl;
+    if (abs(OpHitT) < 30){
+      mf::LogDebug("DAQSimAna") << "OpFlash PE (max/tot) " << MaxHitPE << "/" << TheFlash.TotalPE() << " with purity " << OpFlashPur << " time " << TheFlash.Time();
+    }
   }
 
   std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
@@ -462,7 +464,7 @@ void SolarNuAna::analyze(art::Event const & evt)
     
     recob::Hit const& ThisHit = reco_hits->at(hit);
     if (ThisHit.PeakTime() < 0) PrintInColor("Negative Hit Time = " + str(ThisHit.PeakTime()), GetColor("red"));
-    if (fDebug) std::cout << "Hit " << hit << " has view " << ThisHit.View() << " and signal type " << ThisHit.SignalType() << std::endl;
+    mf::LogDebug("DAQSimAna") << "Hit " << hit << " has view " << ThisHit.View() << " and signal type " << ThisHit.SignalType();
 
     if      (ThisHit.SignalType() == 0 && ThisHit.View() == 0){ColHits0.push_back( ThisHit );} // SignalType = 0
     else if (ThisHit.SignalType() == 0 && ThisHit.View() == 1){ColHits1.push_back( ThisHit );} // SignalType = 0
@@ -519,10 +521,6 @@ void SolarNuAna::analyze(art::Event const & evt)
         geo::Vector_t direction = eXYZ - sXYZ;
         auto dyds = direction.Y(), dzds = direction.Z();
         thisdzdy.push_back(dzds/dyds);
-        
-        // Choose the position reco method to use for the cluster reco
-        if (sPositionReco == "DEFAULT") {if (fDebug) std::cout << "Using default position reco method" << std::endl;}
-        else {if (fDebug) std::cout << "ERROR: Position reco method not recognised. Defaulting to standard." << std::endl;}
 
         int TPC = hit.WireID().TPC;
         clustTPC += hit.Integral() * TPC; 
@@ -537,7 +535,7 @@ void SolarNuAna::analyze(art::Event const & evt)
           if (ThisHitIDE[ideL].energyFrac > TopEFrac){
             TopEFrac = ThisHitIDE[ideL].energyFrac;
             MainTrID = ThisHitIDE[ideL].trackID; 
-            if (fDebug) std::cout << "This hit's IDE is: " << MainTrID << std::endl; 
+            mf::LogDebug("DAQSimAna") << "This hit's IDE is: " << MainTrID; 
           }
         }
 
@@ -554,7 +552,7 @@ void SolarNuAna::analyze(art::Event const & evt)
         
         long unsigned int ThisPType = WhichParType(abs(MainTrID));
         GenPur[int(ThisPType)] = GenPur[int(ThisPType)] + hit.Integral();
-        if (fDebug) std::cout << "\nThis particle type " << ThisPType << "\nThis cluster's main track ID " << MainTrID;    
+        mf::LogDebug("DAQSimAna") << "\nThis particle type " << ThisPType << "\nThis cluster's main track ID " << MainTrID;    
         if (ThisPType == 1){hitCharge = hit.Integral();Pur = Pur+hitCharge;}
       }
 
@@ -571,7 +569,7 @@ void SolarNuAna::analyze(art::Event const & evt)
       dzdy = thisdzdy[0]; thisdzdy.clear();      
       FracE /= ncharge; FracGa /= ncharge; FracNe /= ncharge; FracRest /= ncharge;
       clustTPC /= ncharge; clustX /= ncharge; clustY /= ncharge;clustZ /= ncharge;clustT /= ncharge;
-      if (fDebug) std::cout << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx << std::endl; 
+      mf::LogDebug("DAQSimAna") << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx; 
       if (clustT < 0) PrintInColor("Negative Cluster Time = " + str(clustT), GetColor("red"));
 
       ClTotChrg[idx].push_back(ncharge);
@@ -592,7 +590,8 @@ void SolarNuAna::analyze(art::Event const & evt)
       ClMainID[idx].push_back(MainTrID);
       ClGenPur[idx].push_back(GenPur);
 
-      if (fDebug) std::cout << "\nCluster " << i << " in plane " << idx << " has " << nhit << " hits, " << ncharge << " charge, " << clustT << " time, " << clustX << " X, " << clustY << " Y, " << clustZ << " Z, " << FracE << " FracE, " << FracGa << " FracGa, " << FracNe << " FracNe, " << FracRest << " FracRest, " << Pur/ncharge << " Pur, " << Gen << " gen, " << dzdy << " dzdy, " << MainTrID << " MainTrID" << std::endl;
+      mf::LogDebug("DAQSimAna") << "\nCluster " << i << " in plane " << idx << " has #hits" << nhit << " charge, " << ncharge << " time, " << clustT;
+      mf::LogDebug("DAQSimAna") << " and position (" << clustY << ", " << clustZ << ") with main track ID " << MainTrID << " and purity " << Pur/ncharge;
     }
   } // Finished first cluster processing
   std::cout << "\nLooking for matching clusters: " << std::endl;
@@ -686,30 +685,25 @@ void SolarNuAna::analyze(art::Event const & evt)
       
       float buffer = 1;
       if ((ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY) && (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY)){
-        if(fDebug){std::cout << "BOTH IND RECO INSIDE OF DETECTOR" << std::endl;}
+        mf::LogDebug("SolarNuAna") << "BOTH IND RECO INSIDE OF DETECTOR";
         MVecRecY.push_back((ind0clustY+ind1clustY)/2);}
       else if (ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY){
-        if(fDebug){std::cout << "IND1 OUTSIDE OF DETECTOR" << std::endl;}
+        mf::LogDebug("SolarNuAna") << "IND1 OUTSIDE OF DETECTOR";
         MVecRecY.push_back(ind0clustY);}
       else if (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY){
-        if(fDebug){std::cout << "IND0 OUTSIDE OF DETECTOR" << std::endl;}
+        mf::LogDebug("SolarNuAna") << "IND0 OUTSIDE OF DETECTOR";
         MVecRecY.push_back(ind1clustY);}
       else{
-        if(fDebug){std::cout << "RECO OUTSIDE OF DETECTOR" << std::endl;}
+        mf::LogDebug("SolarNuAna") << "RECO OUTSIDE OF DETECTOR";
         MVecRecY.push_back((ind0clustY+ind1clustY)/2); 
         if (ClGen[2][ii] == 1){PrintInColor("Marley cluster reconstructed outside of detector volume! RecoY = " + str((ind0clustY+ind1clustY)/2), GetColor("red"));}
       }
 
       // Print in color if the cluster is matched
-      if (fDebug){
-        std::string MatchedColor = "white";
-        if (ClNHits[2][ii] > fClusterMatchMinNHit && (ind0clustNHits > fClusterMatchMinNHit || ind1clustNHits > fClusterMatchMinNHit)){MatchedColor = "blue";}
-        else{MatchedColor = "white";}
-        PrintInColor("¡¡¡ Matched clusters !!! ", GetColor(MatchedColor));
-        PrintInColor(" - Cluster " + str(ClMainID[2][ii]) + " Gen " + str(ClGen[2][ii]) + " Purity " + str(ClPur[2][ii]) + " Hits " + str(ClNHits[2][ii]), GetColor(MatchedColor));
-        PrintInColor(" - Hits(ind0, ind1, col) " + str(ind0clustNHits) + ", " + str(ind1clustNHits) + ", " + str(ClNHits[2][ii]), GetColor(MatchedColor));
-        PrintInColor(" - Positions y(ind0, ind1) = " + str(ind0clustY) + ", " + str(ind1clustY) + ", z = " + str(ClZ[2][ii]) + "\n", GetColor(MatchedColor));
-      }    
+      mf::LogDebug("DAQSimAna") << "¡¡¡ Matched cluster !!! ";
+      mf::LogDebug("DAQSimAna") << " - Cluster " << str(ClMainID[2][ii]) << " Gen " << str(ClGen[2][ii]) << " Purity " << str(ClPur[2][ii]) << " Hits " << str(ClNHits[2][ii]);
+      mf::LogDebug("DAQSimAna") << " - Hits(ind0, ind1, col) " << str(ind0clustNHits) << ", " << str(ind1clustNHits) << ", " << str(ClNHits[2][ii]);
+      mf::LogDebug("DAQSimAna") << " - Positions y(ind0, ind1) = " << str(ind0clustY) << ", " << str(ind1clustY) << ", z = " << str(ClZ[2][ii]) << "\n";
     } // if (match == true)
   } // Loop over collection plane clusters
   
@@ -1031,7 +1025,7 @@ void SolarNuAna::FillMyMaps( std::map< int, simb::MCParticle> &MyMap, art::FindM
     for ( size_t L2=0; L2 < Assn.at(L1).size(); ++L2 ) {
       const simb::MCParticle ThisPar = (*Assn.at(L1).at(L2));
       MyMap[ThisPar.TrackId()] = ThisPar;
-      if (fDebug) std::cout << ThisPar.PdgCode() << " " << ThisPar.E() << std::endl;
+      mf::LogDebug("DAQSimAna") << ThisPar.PdgCode() << " " << ThisPar.E();
     }
   }
   return;
