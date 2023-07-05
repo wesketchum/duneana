@@ -82,11 +82,9 @@ private:
   std::string fRawDigitLabel,fHitLabel,fOpHitLabel,fOpDetWaveformLabel,fOpFlashLabel,fGEANTLabel; 
 
   // --- Input settings imported from the fcl
-  std::string sPositionReco;
   std::vector<std::string> fLabels;
   int fMaxDetSizeY, fClusterMatchMinNHit, fGoalInd0MatchTime, fGoalInd1MatchTime;
   float fClusterMatchTime,fAdjClusterTime,fAdjClusterRad,fAdjOpFlashRad,fAdjOpFlashTime,fAdjOpFlashMaxPECut,fAdjOpFlashMinPECut;
-  bool fTestNewClReco;
   
   // --- Our TTrees, and its associated variables.
   TTree* fSolarNuAnaTree;
@@ -133,7 +131,6 @@ void SolarNuAna::reconfigure(fhicl::ParameterSet const & p){
   fOpHitLabel         = p.get<std::string>  ("OpHitLabel");
   fGEANTLabel         = p.get<std::string>  ("GEANT4Label");
 
-  sPositionReco        = p.get<std::string> ("PositionRecoMode","DEFAULT");
   fMaxDetSizeY         = p.get<int>         ("DetectorSizeY");
   fClusterMatchMinNHit = p.get<int>         ("ClusterMatchMinNHit");
   fClusterMatchTime    = p.get<float>       ("ClusterMatchTime");
@@ -145,7 +142,6 @@ void SolarNuAna::reconfigure(fhicl::ParameterSet const & p){
   fAdjOpFlashRad       = p.get<float>       ("AdjOpFlashRad");
   fAdjOpFlashMaxPECut  = p.get<float>       ("AdjOpFlashMaxPECut");
   fAdjOpFlashMinPECut  = p.get<float>       ("AdjOpFlashMinPECut");
-  fTestNewClReco       = p.get<bool>        ("TestNewClReco",false);
 } // Reconfigure
 
 //......................................................
