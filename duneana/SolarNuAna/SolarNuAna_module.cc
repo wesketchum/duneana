@@ -19,7 +19,7 @@
 #include "TTree.h"
 #include "TVector3.h"
 #include "TRandom.h"
-// #include "DisplacementVector3D.h"
+#include <fcntl.h>
 
 // Framework includes (not all might be necessary)
 #include "larcore/Geometry/Geometry.h"
@@ -76,7 +76,8 @@ private:
   std::string       str           ( std::vector<int> MyVec );
   std::string       str           ( std::vector<float> MyVec );
   std::string       str           ( std::vector<double> MyVec );
-  
+  int supress_stdout();
+  void resume_stdout(int fd);
   // --- Our fcl parameter labels for the modules that made the data products
   std::string fRawDigitLabel,fHitLabel,fOpHitLabel,fOpDetWaveformLabel,fOpFlashLabel,fGEANTLabel; 
 
@@ -92,9 +93,9 @@ private:
   TTree* fMCTruthTree;
   std::string MGenLabel;
   int Run,SubRun,Event,Flag,MNHit,MGen,MTPC,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
-  float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP;
+  float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP,MMainParentE,MMainParentP,MMainParentT;
   std::vector<int> MAdjClGen,MAdjClMainID,TPart,MarleyPDGList,MarleyIDList,MarleyParentIDList,MAdjClMainPDG;
-  std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainX,MMarleyFrac,MGenFrac;
+  std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainE,MAdjClMainX,MAdjClMainY,MAdjClMainZ,MMarleyFrac,MGenFrac;
   std::vector<float> MAdjFlashTime,MAdjFlashPE,MAdjFlashNHit,MAdjFlashMaxPE,MAdjFlashRecoY,MAdjFlashRecoZ,MAdjFlashR,MAdjFlashPur;
   std::vector<float> MarleyEList,MarleyPList,MarleyXList,MarleyYList,MarleyZList;
   std::vector<double> MMainVertex,MMainParentVertex;
@@ -221,6 +222,9 @@ void SolarNuAna::beginJob(){
   fSolarNuAnaTree -> Branch("MainP",            &MMainP,           "MainP/F");         // Main cluster main momentum [GeV]
   fSolarNuAnaTree -> Branch("MainPDG",          &MMainPDG,         "MainPDG/I");       // Main cluster main pdg
   fSolarNuAnaTree -> Branch("MainParentPDG",    &MMainParentPDG,   "MainParentPDG/I"); // Main cluster main pdg
+  fSolarNuAnaTree -> Branch("MainParentE",      &MMainParentE,     "MainParentE/F");   // Main cluster main parent energy [GeV]
+  fSolarNuAnaTree -> Branch("MainParentP",      &MMainParentP,     "MainParentP/F");   // Main cluster main parent momentum [GeV]
+  fSolarNuAnaTree -> Branch("MainParentT",      &MMainParentT,     "MainParentT/F");   // Main cluster main parent Time [ticks]
   fSolarNuAnaTree -> Branch("MainVertex",       &MMainVertex);                         // Main cluster main particle vertex [cm]
   fSolarNuAnaTree -> Branch("MainParentVertex", &MMainParentVertex);                   // Main cluster main particle vertex [cm]
   fSolarNuAnaTree -> Branch("GenFrac",          &MGenFrac);                            // Main cluster reco purity complete
@@ -237,8 +241,11 @@ void SolarNuAna::beginJob(){
   fSolarNuAnaTree -> Branch("AdjClPur",       &MAdjClPur);                           // Adj. clusters' purity
   fSolarNuAnaTree -> Branch("AdjClR",         &MAdjClR);                             // Adj. clusters' distance [cm]
   fSolarNuAnaTree -> Branch("AdjClMainID",    &MAdjClMainID);                        // Adj. clusters' main track ID
+  fSolarNuAnaTree -> Branch("AdjClMainPDG",   &MAdjClMainPDG);                       // Adj. clusters' main PDG
+  fSolarNuAnaTree -> Branch("AdjClMainE",     &MAdjClMainE);                         // Adj. clusters' main energy [GeV]
   fSolarNuAnaTree -> Branch("AdjClMainX",     &MAdjClMainX);                         // Adj. clusters' main X [cm]
-  fSolarNuAnaTree -> Branch("AdjClMainPDG",   &MAdjClMainPDG);                         // Adj. clusters' main PDG
+  fSolarNuAnaTree -> Branch("AdjClMainY",     &MAdjClMainY);                         // Adj. clusters' main Y [cm]
+  fSolarNuAnaTree -> Branch("AdjClMainZ",     &MAdjClMainZ);                         // Adj. clusters' main Z [cm]
   
   // Adj. Flash info.
   fSolarNuAnaTree -> Branch("AdjOpFlashTime", &MAdjFlashTime);                       // Adj. flash' time [ticks]
@@ -423,7 +430,10 @@ void SolarNuAna::analyze(art::Event const & evt)
     }
 
     if (fDebug) std::cout << "Evaluating Flash purity" << std::endl;
+    // Calculate the flash purity
+    int TerminalOutput = supress_stdout();
     double OpFlashPur = pbt->OpHitCollectionPurity(signal_trackids, matchedHits);
+    resume_stdout(TerminalOutput);
     if (fDebug) std::cout << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT << std::endl;
 
     // Calculate the flash purity, only for the Marley events
@@ -603,8 +613,8 @@ void SolarNuAna::analyze(art::Event const & evt)
     double ind0clustdT = fClusterMatchTime, ind1clustdT = fClusterMatchTime;
     // std::cout << "Test" << std::endl;
     if (!AllPlaneClusters[2][ii].empty()){
-      if (fDebug) std::cout << "***Evaluating main cluster " << ii << " for size " <<  AllPlaneClusters[2][ii].size() << std::endl;
-      if (fDebug) std::cout << "This cluster's position is (" << ClY[2][ii] << ", " << ClZ[2][ii] << ") and its time is " << ClT[2][ii] << std::endl;
+      // std::cout << "***Evaluating main cluster " << ii << " for size " <<  AllPlaneClusters[2][ii].size() << std::endl;
+      // std::cout << "This cluster's position is (" << ClY[2][ii] << ", " << ClZ[2][ii] << ") and its time is " << ClT[2][ii] << std::endl;
 
       if (!AllPlaneClusters[0].empty()){
         for (int jj = 0; jj < int(AllPlaneClusters[0].size()); jj++){
@@ -615,8 +625,8 @@ void SolarNuAna::analyze(art::Event const & evt)
             ind0clustMaxHit = ClMaxChrg[0][jj];
             ind0clustTPC = ClTPC[0][jj];
             if (ind0clustY > -fMaxDetSizeY && ind0clustY < fMaxDetSizeY){match = true;}
-            if (fDebug) std::cout << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj] << std::endl;
-            if (fDebug) std::cout << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii] << std::endl;  
+            // std::cout << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj] << std::endl;
+            // std::cout << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii] << std::endl;  
           }
         }
       }
@@ -629,8 +639,8 @@ void SolarNuAna::analyze(art::Event const & evt)
             ind1clustMaxHit = ClMaxChrg[1][zz];
             ind1clustTPC = ClTPC[1][zz];
             if (ind1clustY > -fMaxDetSizeY && ind1clustY < fMaxDetSizeY){match = true;}
-            if (fDebug) std::cout << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz] << std::endl;
-            if (fDebug) std::cout << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii] << std::endl;
+            // std::cout << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz] << std::endl;
+            // std::cout << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii] << std::endl;
           }
         } // Loop over ind1 clusters
       }
@@ -676,16 +686,16 @@ void SolarNuAna::analyze(art::Event const & evt)
       
       float buffer = 1;
       if ((ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY) && (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY)){
-        if (fDebug) std::cout << "BOTH IND RECO INSIDE OF DETECTOR" << std::endl;
+        if(fDebug){std::cout << "BOTH IND RECO INSIDE OF DETECTOR" << std::endl;}
         MVecRecY.push_back((ind0clustY+ind1clustY)/2);}
       else if (ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY){
-        if (fDebug) std::cout << "IND1 OUTSIDE OF DETECTOR" << std::endl;
+        if(fDebug){std::cout << "IND1 OUTSIDE OF DETECTOR" << std::endl;}
         MVecRecY.push_back(ind0clustY);}
       else if (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY){
-        if (fDebug) std::cout << "IND0 OUTSIDE OF DETECTOR" << std::endl;
+        if(fDebug){std::cout << "IND0 OUTSIDE OF DETECTOR" << std::endl;}
         MVecRecY.push_back(ind1clustY);}
       else{
-        if (fDebug) std::cout << "RECO OUTSIDE OF DETECTOR" << std::endl;
+        if(fDebug){std::cout << "RECO OUTSIDE OF DETECTOR" << std::endl;}
         MVecRecY.push_back((ind0clustY+ind1clustY)/2); 
         if (ClGen[2][ii] == 1){PrintInColor("Marley cluster reconstructed outside of detector volume! RecoY = " + str((ind0clustY+ind1clustY)/2), GetColor("red"));}
       }
@@ -707,7 +717,8 @@ void SolarNuAna::analyze(art::Event const & evt)
   // Loop over matched clusters and export to tree if number of hits is above threshold
   for (int i = 0; i < int(MVecNHit.size()); i++){
     if(MVecNHit[i] > fClusterMatchMinNHit && (MVecInd0NHits[i] > fClusterMatchMinNHit || MVecInd1NHits[i] > fClusterMatchMinNHit)){
-      MAdjClTime = {};MAdjClCharge = {};MAdjClNHit = {};MAdjClRecoY = {};MAdjClRecoZ = {};MAdjClR = {};MAdjClPur = {};MAdjClGen = {};MAdjClMainID = {};MAdjClMainPDG = {};MAdjClMainX = {};
+      MAdjClTime = {};MAdjClCharge = {};MAdjClNHit = {};MAdjClRecoY = {};MAdjClRecoZ = {};MAdjClR = {};MAdjClPur = {};MAdjClGen = {};MAdjClMainID = {};MAdjClMainPDG = {};
+      MAdjClMainE = {}; MAdjClMainX = {};MAdjClMainY = {};MAdjClMainZ = {};
       MAdjFlashTime = {};MAdjFlashPE = {};MAdjFlashNHit = {};MAdjFlashMaxPE = {};MAdjFlashRecoY = {};MAdjFlashRecoZ = {};MAdjFlashR = {};MAdjFlashPur = {};
       
       std::string ResultColor = "white";
@@ -730,21 +741,25 @@ void SolarNuAna::analyze(art::Event const & evt)
           MAdjClPur.push_back(MVecPur[j]);
           MAdjClGen.push_back(MVecGen[j]);
           MAdjClMainID.push_back(MVecMainID[j]);
-          if (MVecMainID[j] != 0){
-            const simb::MCParticle *MAdjClTruth;
-            MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
-            if (MAdjClTruth == 0) {
-              MAdjClMainX.push_back(-1e6);
-              MAdjClMainPDG.push_back(0);          
-            }
-            else{
-              MAdjClMainX.push_back(MAdjClTruth->Vx());
-              MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
-            }
+
+          // If mother exists add the mother information
+          const simb::MCParticle *MAdjClTruth;
+          MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
+          if (MAdjClTruth == 0) {
+            // PrintInColor("MAdjClTruth == 0",GetColor("red"));
+            MAdjClMainPDG.push_back(0);          
+            MAdjClMainE.push_back(-1e6);
+            MAdjClMainX.push_back(-1e6);
+            MAdjClMainY.push_back(-1e6);
+            MAdjClMainZ.push_back(-1e6);
           }
           else{
-            MAdjClMainX.push_back(-1e6);
-            MAdjClMainPDG.push_back(0);
+            // PrintInColor("MAdjClTruth->Mother()"+str(MAdjClTruth->Mother()),GetColor("blue"));
+            MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
+            MAdjClMainE.push_back(MAdjClTruth->E());
+            MAdjClMainX.push_back(MAdjClTruth->Vx());
+            MAdjClMainY.push_back(MAdjClTruth->Vy());
+            MAdjClMainZ.push_back(MAdjClTruth->Vz());
           }
         }
       }
@@ -782,60 +797,61 @@ void SolarNuAna::analyze(art::Event const & evt)
       MInd1dT =     MVecInd1dT[i];   
       MInd0RecoY =  MVecInd0RecoY[i];   
       MInd1RecoY =  MVecInd1RecoY[i];   
+      MMainID =     MVecMainID[i];
       MRecZ =       MVecRecZ[i];   
       MPur =        MVecPur[i];
       MGen =        MVecGen[i];
-      MMainID =     MVecMainID[i];
 
       // If mother exists add the mother information
-      if (MVecMainID[i] != 0){
-        const simb::MCParticle *MClTruth;
-        MClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[i]);
-        if (MClTruth == 0){
-          MMainVertex = {-1e6,-1e6,-1e6};
-          MMainPDG =    0;
+      const simb::MCParticle *MClTruth;
+      MClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[i]);
+      if (MClTruth == 0){
+        // PrintInColor("MClTruth == 0",GetColor("red"));
+        MMainVertex = {-1e6,-1e6,-1e6};
+        MMainPDG =       0;
+        MMainE =      -1e6;
+        MMainT =      -1e6;
+        MMainP =      -1e6;
+        
+        MMainParentVertex = {-1e6,-1e6,-1e6};
+        MMainParentPDG =       0;
+        MMainParentE =      -1e6;
+        MMainParentT =      -1e6;
+        MMainParentP =      -1e6;
+      }
+      else{
+        // PrintInColor("MClTruth->Mother() "+str(MClTruth->Mother()),GetColor("blue"));
+        MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
+        MMainPDG =    MClTruth->PdgCode();
+        MMainE =      MClTruth->E();
+        MMainT =      MClTruth->T();
+        MMainP =      MClTruth->P();
+        // If exists add the parent information
+        const simb::MCParticle *MClParentTruth;
+        MClParentTruth = pi_serv->TrackIdToParticle_P(MClTruth->Mother());
+        if (MClParentTruth == 0){
+          // PrintInColor("MClParentTruth == 0",GetColor("red"));
+          MMainParentVertex = {-1e6,-1e6,-1e6};
+          MMainParentPDG =       0;
+          MMainParentE =      -1e6;
+          MMainParentT =      -1e6;
+          MMainParentP =      -1e6;
         }
         else{
-          MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
-          MMainPDG =    MClTruth->PdgCode();
+          // PrintInColor("MClParentTruth->Mother() "+str(MClParentTruth->Mother()),GetColor("blue"));
+          MMainParentVertex = {MClParentTruth->Vx(),MClParentTruth->Vy(),MClParentTruth->Vz()};
+          MMainParentPDG =    MClParentTruth->PdgCode();
+          MMainParentE =      MClParentTruth->E();
+          MMainParentT =      MClParentTruth->T();
+          MMainParentP =      MClParentTruth->P();
         }
-        
-        // If exists add the parent information
-        if(MClTruth->Mother() != 0){ // Check if the particle has a parent
-          const simb::MCParticle *MClParentTruth;
-          MClParentTruth =    pi_serv->TrackIdToParticle_P(MClTruth->Mother());
-          if (MClParentTruth == 0){
-            MMainParentVertex = {-1e6,-1e6,-1e6};
-            MMainParentPDG =    0;
-          }
-          else{
-            MMainParentVertex = {MClParentTruth->Vx(),MClParentTruth->Vy(),MClParentTruth->Vz()};
-            MMainParentPDG =    MClParentTruth->PdgCode();
-          }
-        }
-
-        else{ // If not set the parent information to -1e6
-          MMainParentVertex = {-1e6,-1e6,-1e6};
-          MMainParentPDG =    0;
-          MMainE =            MClTruth->E();
-          MMainT =            MClTruth->T();
-          MMainP =            MClTruth->P();
-        }
-      }
-      
-      else{ // If not set the mother information to -1e6
-        MMainVertex = {-1e6,-1e6,-1e6};
-        MMainPDG =    0;
-        MMainE =      0;
-        MMainT =      0;     
-        MMainP =      0;
       }
 
       hDriftTime->      Fill(avX,MTime);
       fSolarNuAnaTree-> Fill();
       hXTruth->         Fill(MVecRecY[i]-TNuY,TNuX); 
       hYTruth->         Fill(MVecRecY[i]-TNuY,TNuY); 
-      hZTruth->         Fill(MVecRecY[i]-TNuY,TNuZ); 
+      hZTruth->         Fill(MVecRecZ[i]-TNuZ,TNuZ); 
       if (MVecTime[i]<0) std::cout << "Negative Main Cluster Time = " << MVecTime[i] << std::endl;
     }
   }
@@ -1059,5 +1075,23 @@ std::string SolarNuAna::str( float i ) {std::stringstream ss;ss << i;return ss.s
 std::string SolarNuAna::str( std::vector<int> i ) {std::stringstream ss;for (int j = 0; j < int(i.size()); j++){ss << i[j] << " ";}return ss.str();}
 std::string SolarNuAna::str( std::vector<double> i ) {std::stringstream ss;for (int j = 0; j < int(i.size()); j++){ss << i[j] << " ";}return ss.str();}
 std::string SolarNuAna::str( std::vector<float> i ) {std::stringstream ss;for (int j = 0; j < int(i.size()); j++){ss << i[j] << " ";}return ss.str();}
+
+int SolarNuAna::supress_stdout() {
+  std::fflush(stdout);
+
+  int ret = dup(1);
+  int nullfd = open("/dev/null", O_WRONLY);
+  // check nullfd for error omitted
+  dup2(nullfd, 1);
+  close(nullfd);
+
+  return ret;
+}
+
+void SolarNuAna::resume_stdout(int fd) {
+  std::fflush(stdout);
+  dup2(fd, 1);
+  close(fd);
+}
 
 DEFINE_ART_MODULE(SolarNuAna)
