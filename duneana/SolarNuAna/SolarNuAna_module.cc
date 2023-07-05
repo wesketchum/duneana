@@ -86,7 +86,7 @@ private:
   std::vector<std::string> fLabels;
   int fMaxDetSizeY, fClusterMatchMinNHit, fGoalInd0MatchTime, fGoalInd1MatchTime;
   float fClusterMatchTime,fAdjClusterTime,fAdjClusterRad,fAdjOpFlashRad,fAdjOpFlashTime,fAdjOpFlashMaxPECut,fAdjOpFlashMinPECut;
-  bool fTestNewClReco, fDebug;
+  bool fTestNewClReco;
   
   // --- Our TTrees, and its associated variables.
   TTree* fSolarNuAnaTree;
@@ -146,7 +146,6 @@ void SolarNuAna::reconfigure(fhicl::ParameterSet const & p){
   fAdjOpFlashMaxPECut  = p.get<float>       ("AdjOpFlashMaxPECut");
   fAdjOpFlashMinPECut  = p.get<float>       ("AdjOpFlashMinPECut");
   fTestNewClReco       = p.get<bool>        ("TestNewClReco",false);
-  fDebug               = p.get<bool>        ("Debug",false);
 } // Reconfigure
 
 //......................................................
@@ -738,7 +737,9 @@ void SolarNuAna::analyze(art::Event const & evt)
 
           // If mother exists add the mother information
           const simb::MCParticle *MAdjClTruth;
+          int TerminalOutput = supress_stdout();
           MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
+          resume_stdout(TerminalOutput);
           if (MAdjClTruth == 0) {
             // PrintInColor("MAdjClTruth == 0",GetColor("red"));
             MAdjClMainPDG.push_back(0);          
@@ -798,7 +799,9 @@ void SolarNuAna::analyze(art::Event const & evt)
 
       // If mother exists add the mother information
       const simb::MCParticle *MClTruth;
+      int TerminalOutput = supress_stdout();
       MClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[i]);
+      resume_stdout(TerminalOutput);
       if (MClTruth == 0){
         // PrintInColor("MClTruth == 0",GetColor("red"));
         MMainVertex = {-1e6,-1e6,-1e6};
@@ -822,7 +825,9 @@ void SolarNuAna::analyze(art::Event const & evt)
         MMainP =      MClTruth->P();
         // If exists add the parent information
         const simb::MCParticle *MClParentTruth;
+        int TerminalOutput = supress_stdout();
         MClParentTruth = pi_serv->TrackIdToParticle_P(MClTruth->Mother());
+        resume_stdout(TerminalOutput);
         if (MClParentTruth == 0){
           // PrintInColor("MClParentTruth == 0",GetColor("red"));
           MMainParentVertex = {-1e6,-1e6,-1e6};
