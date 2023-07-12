@@ -262,7 +262,8 @@ namespace dune {
       TrackData_t<Float_t> trkmommsllhd;   // track momentum from multiple scattering LLHD method
       TrackData_t<Short_t> trksvtxid;     // Vertex ID associated with the track start
       TrackData_t<Short_t> trkevtxid;     // Vertex ID associated with the track end
-      PlaneData_t<Int_t> trkpidpdg;       // particle PID pdg code
+      PlaneData_t<Int_t> trkpidpdg;       // [deprecated] particle PID pdg code
+      PlaneData_t<Int_t> trkpidndf;       // Particle PID ndf based on valid hits
       PlaneData_t<Float_t> trkpidchi;
       PlaneData_t<Float_t> trkpidchipr;   // particle PID chisq for proton
       PlaneData_t<Float_t> trkpidchika;   // particle PID chisq for kaon
@@ -1524,6 +1525,7 @@ void dune::AnalysisTreeDataStruct::TrackDataStruct::Resize(size_t nTracks)
   trkevtxid.resize(MaxTracks);
   // PID variables
   trkpidpdg.resize(MaxTracks);
+  trkpidndf.resize(MaxTracks);
   trkpidchi.resize(MaxTracks);
   trkpidchipr.resize(MaxTracks);
   trkpidchika.resize(MaxTracks);
@@ -1638,6 +1640,7 @@ void dune::AnalysisTreeDataStruct::TrackDataStruct::Clear() {
     FillWith(trkxyz[iTrk], 0.);
 
     FillWith(trkpidpdg[iTrk]    , -1);
+    FillWith(trkpidndf[iTrk]    , -9999);
     FillWith(trkpidchi[iTrk]    , -99999.);
     FillWith(trkpidchipr[iTrk]  , -99999.);
     FillWith(trkpidchika[iTrk]  , -99999.);
@@ -1851,6 +1854,9 @@ void dune::AnalysisTreeDataStruct::TrackDataStruct::SetAddresses(
 
   BranchName = "trkpidpdg_" + TrackLabel;
   CreateBranch(BranchName, trkpidpdg, BranchName + NTracksIndexStr + "[3]/I");
+
+  BranchName = "trkpidndf_" + TrackLabel;
+  CreateBranch(BranchName, trkpidndf, BranchName + NTracksIndexStr + "[3]/I");
 
   BranchName = "trkpidchi_" + TrackLabel;
   CreateBranch(BranchName, trkpidchi, BranchName + NTracksIndexStr + "[3]/F");
@@ -4570,33 +4576,43 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
            }*/
 
         // find particle ID info
-        /*
-        // Note from Jake Calcutt: There has been a breaking change in the definition
-        // of the anab::ParticleID class. If you are using this class and want this info
-        // in this tree, these must be updated
+        // This was updated to gather the Chi2 information for each particle with the new definitions of anab::ParticleID class. It was previously commented by Jake Calcutt
         art::FindMany<anab::ParticleID> fmpid(trackListHandle[iTracker], evt, fParticleIDModuleLabel[iTracker]);
         if(fmpid.isValid()) {
           std::vector<const anab::ParticleID*> pids = fmpid.at(iTrk);
-          //if(pids.size() > 1) {
-          //mf::LogError("AnalysisTree:limits")
-          //<< "the " << fTrackModuleLabel[iTracker] << " track #" << iTrk
-          //<< " has " << pids.size()
-          //<< " set of ParticleID variables. Only one stored in the tree";
-          //}
+          
           for (size_t ipid = 0; ipid < pids.size(); ++ipid){
             if (!pids[ipid]->PlaneID().isValid) continue;
             int planenum = pids[ipid]->PlaneID().Plane;
             if (planenum<0||planenum>2) continue;
-            TrackerData.trkpidpdg[iTrk][planenum] = pids[ipid]->Pdg();
-            TrackerData.trkpidchi[iTrk][planenum] = pids[ipid]->MinChi2();
-            TrackerData.trkpidchipr[iTrk][planenum] = pids[ipid]->Chi2Proton();
-            TrackerData.trkpidchika[iTrk][planenum] = pids[ipid]->Chi2Kaon();
-            TrackerData.trkpidchipi[iTrk][planenum] = pids[ipid]->Chi2Pion();
-            TrackerData.trkpidchimu[iTrk][planenum] = pids[ipid]->Chi2Muon();
-            TrackerData.trkpidpida[iTrk][planenum] = pids[ipid]->PIDA();
+
+            auto pidScore = pids[ipid]->ParticleIDAlgScores();
+            for(auto pScore: pidScore){
+              double chi2value = pScore.fValue;
+
+              // PIDA is always the last one and ndf there is -9999
+              if(pScore.fAssumedPdg != 0) TrackerData.trkpidndf[iTrk][planenum] = pScore.fNdf; // This value is the same for each particle type, but different in each plane
+              switch(pScore.fAssumedPdg){
+                case 2212:
+                  TrackerData.trkpidchipr[iTrk][planenum] = chi2value;
+                  break;
+                case 321:
+                  TrackerData.trkpidchika[iTrk][planenum] = chi2value;
+                  break;
+                case 211:
+                  TrackerData.trkpidchipi[iTrk][planenum] = chi2value;
+                  break;
+                case 13:
+                  TrackerData.trkpidchimu[iTrk][planenum] = chi2value;
+                  break;
+                case 0:
+                  TrackerData.trkpidpida[iTrk][planenum] = chi2value;
+                  break;
+              }
+            }
           }
         } // fmpid.isValid()
-        */
+
         if(fMVAPIDTrackModuleLabel[iTracker].size()){
           art::FindOneP<anab::MVAPIDResult> fmvapid(trackListHandle[iTracker], evt, fMVAPIDTrackModuleLabel[iTracker]);
           if(fmvapid.isValid()) {
