@@ -38,6 +38,8 @@ legacy_solar_nu_ana_hd_v4.ParticleLabelVector: ["marley","apaGen","cNeutronGen",
 
 solar_nu_ana_hd: @local::legacy_solar_nu_ana_hd
 solar_nu_ana_hd.ParticleLabelVector: ["marley","Ar39GenInLAr","Kr85GenInLAr","Ar42GenInLAr","K42From42ArGenInLAr","Rn222ChainRn222GenInLAr","Rn222ChainPo218GenInLAr","Rn222ChainPb214GenInLAr","Rn222ChainBi214GenInLAr","Rn222ChainPb210GenInLAr","K40GenInCPA","U238ChainGenInCPA","K42From42ArGenInCPA","Rn222ChainPo218GenInCPA","Rn222ChainPb214GenInCPA","Rn222ChainBi214GenInCPA","Rn222ChainPb210GenInCPA","Rn222ChainFromBi210GenInCPA","Co60GenInAPA","U238ChainGenInAPA","Rn222ChainGenInPDS","NeutronGenInRock"]
+solar_nu_ana_hd.GoalInd0MatchTime: 0
+solar_nu_ana_hd.GoalInd1MatchTime: 0
 
 solar_nu_ana_vd: @local::legacy_solar_nu_ana_hd
 solar_nu_ana_vd.HitLabel:            "gaushit"
@@ -46,6 +48,8 @@ solar_nu_ana_vd.OpHitLabel:          "ophit10ppm"
 solar_nu_ana_vd.OpDetWaveformLabel:  "opdigi10ppm"
 solar_nu_ana_vd.ParticleLabelVector: ["marley","Ar39GenInLAr","Kr85GenInLAr","Ar42GenInLAr","K42From42ArGenInLAr","Rn222ChainGenInLAr","K42From42ArGenInCPA","K40inGenInCPA","U238ChainGenInCPA","Rn222ChainGenInPDS","NeutronGenInRock","GammasGenInRock"]
 solar_nu_ana_vd.DetectorSizeY:       1500 
-solar_nu_ana_vd.AdjOpFlashTime:      8500 
+solar_nu_ana_vd.AdjOpFlashTime:      8500
+solar_nu_ana_vd.GoalInd1MatchTime:   0 
+solar_nu_ana_vd.GoalInd0MatchTime:   0 
 
 END_PROLOG

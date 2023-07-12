@@ -68,7 +68,7 @@ private:
   bool              InMyMap       ( int TrID, std::map< int, simb::MCParticle> ParMap );
   void              FillMyMaps    ( std::map< int, simb::MCParticle> &MyMap, art::FindManyP<simb::MCParticle> Assn, art::ValidHandle< std::vector<simb::MCTruth> > Hand );
   void              CalcAdjHits   ( std::vector< recob::Hit > MyVec,std::vector< std::vector<recob::Hit> >& Clusters,TH1I* MyHist, TH1F* MyADCIntHist, bool HeavDebug );
-  void              PrintInColor  ( std::string MyString, int MyColor );
+  void              PrintInColor  ( std::string MyString, int MyColor, std::string Type = "Info");
   int               GetColor      ( std::string MyString );
   std::string       str           ( int MyInt );
   std::string       str           ( float MyFloat );
@@ -282,17 +282,20 @@ void SolarNuAna::analyze(art::Event const & evt)
   auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
   
   Flag = rand() % 10000000000;
-  std::cout << "\nTPC Frequency in [MHz]: " << clockData.TPCClock().Frequency() << std::endl;
-  std::cout << "TPC Tick in [us]: " << clockData.TPCClock().TickPeriod() << std::endl;
-  std::cout << "Event Flag: " << Flag << std::endl;
-  std::cout << "\nSuccesfull reset of variables for evt " << Event << " run " << Run << std::endl << "########################################" << std::endl;
-  
-  std::cout << std::endl; //---------------------------------------------------------------------------------------------------------------------------------------//
+  std::string sHead = "";
+  sHead = sHead + "\nTPC Frequency in [MHz]: " + str(clockData.TPCClock().Frequency());
+  sHead = sHead + "\nTPC Tick in [us]: " + str(clockData.TPCClock().TickPeriod());
+  sHead = sHead + "\nEvent Flag: " + str(Flag);
+  sHead = sHead + "\nSuccesfull reset of variables for evt " + str(Event);
+  sHead = sHead + "\n#########################################";
+  PrintInColor(sHead,GetColor("magenta"));
+  //---------------------------------------------------------------------------------------------------------------------------------------//
   //----------------------------------------------------------------- Create maps for ID tracking -----------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Fill MC Truth IDs to tracking vectors. Get a list of all of my particles in one chunk. ---  
   const sim::ParticleList& PartList = pi_serv->ParticleList();
-  std::cout << "There are a total of " << PartList.size() << " Particles in the event\n";
+  std::string sMcTruth = "";
+  sMcTruth = sMcTruth + "\nThere are a total of " + str(int(PartList.size())) + " Particles in the event\n";
   
   // Loop over all signal+bkg handles and collect track IDs
   for ( size_t i = 0; i < fLabels.size(); i++){
@@ -305,8 +308,8 @@ void SolarNuAna::analyze(art::Event const & evt)
       auto ThisValidHanlde = evt.getValidHandle<std::vector<simb::MCTruth>>(fLabels[i]); // Get generator handles
       art::FindManyP<simb::MCParticle> Assn(ThisValidHanlde,evt,fGEANTLabel);            // Assign labels to MCPArticles
       FillMyMaps( Parts[i], Assn, ThisValidHanlde);                                      // Fill empty list with previously assigned particles                                       
-      if (Parts[i].size() < 1000){std::cout << "# of particles " << Parts[i].size() << "\tfrom " << fLabels[i] << std::endl;} // Print signal+bkg info to terminal
-      else {std::cout << "# of particles " << Parts[i].size() << "\tfrom " << fLabels[i] << std::endl;}
+      if (Parts[i].size() < 1000){sMcTruth = sMcTruth + "\n# of particles " + str(int(Parts[i].size())) + "\tfrom " + fLabels[i];} // Print signal+bkg info to terminal
+      else {sMcTruth = sMcTruth + "\n# of particles " + str(int(Parts[i].size())) + "\tfrom " + fLabels[i];}
       TPart.push_back(Parts[i].size()); // Insert #signal+bkg particles generated
       for ( std::map<int,simb::MCParticle>::iterator iter = Parts[i].begin(); iter != Parts[i].end(); iter++ ){
         std::set<int> ThisGeneratorIDs = {};
@@ -315,19 +318,21 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
     } 
     else{
-      std::cout << "# of particles " << Parts[i].size() << "\tfrom " << fLabels[i] << " *not generated!" << std::endl;
+      sMcTruth = sMcTruth + "\n# of particles " + str(int(Parts[i].size())) + "\tfrom " + fLabels[i] + " *not generated!";
       TPart.push_back(0);
       std::set<int> ThisGeneratorIDs = {};
       trackids.push_back(ThisGeneratorIDs);
     }
   }
+  PrintInColor(sMcTruth,GetColor("yellow"));
 
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //----------------------------------------------------------------- Some MC Truth information -------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   std::set< int > signal_trackids;                                // Signal TrackIDs to be used in OpFlash matching
   std::vector<std::vector<int>> ClPartTrackIDs = {{},{},{},{}};   // Track IDs corresponding to each kind of MCTruth particle  {11,22,2112,else}
   art::Handle<std::vector<simb::MCTruth>> ThisHandle;
+  std::string sNuTruth = "";
   evt.getByLabel(fLabels[0], ThisHandle);
   if (ThisHandle){
     auto MarlTrue = evt.getValidHandle<std::vector<simb::MCTruth> >(fLabels[0]);  // Get handle for MARLEY MCTruths
@@ -341,9 +346,11 @@ void SolarNuAna::analyze(art::Event const & evt)
       TNuY =    nue.Nu().Vy();
       TNuZ =    nue.Nu().Vz();
       int N =   MARLEYtruth.NParticles(); 
-      std::cout << "Number of Neutrino Daughters: " << N-2 << std::endl; 
-      std::cout << "Neutrino energy: " << TNuE << " GeV; with transfer momentum: " << std::sqrt(TNuQSqr) << " GeV" << std::endl; 
-      std::cout << "Position (" << TNuX << ", " << TNuY << ", " << TNuZ << ") cm" << std::endl;
+      
+      sNuTruth = sNuTruth + "\nNumber of Neutrino Daughters: " + str(N-2);
+      sNuTruth = sNuTruth + "\nNeutrino energy: " + str(TNuE) + " GeV"; 
+      sNuTruth = sNuTruth + "\nMomentumTransfer: " + str(std::sqrt(TNuQSqr)) + " GeV";
+      sNuTruth = sNuTruth + "\nPosition (" + str(TNuX) + ", " + str(TNuY) + ", " + str(TNuZ) + ") cm";
       
       // Save information of each daughter particle of the marley process
       for ( int i = 0; i < N; i++) {
@@ -358,38 +365,36 @@ void SolarNuAna::analyze(art::Event const & evt)
         float MarleyParticleZ = MarleyParticle.EndZ();    MarleyZList.push_back(MarleyParticleZ);
       }
     }
-    
     art::FindManyP<simb::MCParticle> MarlAssn(MarlTrue,evt,fGEANTLabel);
-    std::cout << "\nGen.\t " << "PdgCode\t Energy\t\t TrackID" << std::endl;
-    std::cout << "------------------------------------------------" << std::endl;
+    sNuTruth = sNuTruth + "\nGen.\t PdgCode\t Energy\t\t TrackID \n------------------------------------------------";
     
     for ( size_t i = 0; i < MarlAssn.size(); i++) {
       auto parts = MarlAssn.at(i);
       for (auto part = parts.begin(); part != parts.end(); part++) {
         signal_trackids.emplace((*part)->TrackId());
 
-        if ((*part)->PdgCode()<1000000){std::cout << fLabels[0] << "\t " << (*part)->PdgCode() << "\t\t " << (*part)->E() << "\t " << (*part)->TrackId() << std::endl;}
-        else{std::cout << fLabels[0] << "\t " << (*part)->PdgCode() << "\t " << (*part)->E() << "\t " << (*part)->TrackId() << std::endl;}
+        if ((*part)->PdgCode()<1000000){sNuTruth = sNuTruth + "\n" + fLabels[0] + "\t " + str((*part)->PdgCode()) + "\t\t " + str((*part)->E()) + "\t " + str((*part)->TrackId());}
+        else{sNuTruth = sNuTruth + "\n" + fLabels[0] + "\t " + str((*part)->PdgCode()) + "\t " + str((*part)->E()) + "\t " + str((*part)->TrackId());}
 
         if ((*part)->PdgCode()==11){ // Electrons
           const TLorentzVector &v4_f = (*part)->EndPosition();
           auto x_f = v4_f.X();auto y_f = v4_f.Y();auto z_f = v4_f.Z();
           avX = x_f; avY = y_f; avZ = z_f;
           ClPartTrackIDs[0].push_back((*part)->TrackId());
-          mf::LogDebug("DAQSimAna") << "\nMC Electron truth position x = " << avX << ", y = " << avY << ", z = " << avZ;
-          mf::LogDebug("DAQSimAna") << "Initial KE " << (*part)->E()-(*part)->Mass();
+          mf::LogDebug("SolarNuAna") << "\nMC Electron truth position x = " << avX << ", y = " << avY << ", z = " << avZ;
+          mf::LogDebug("SolarNuAna") << "Initial KE " << (*part)->E()-(*part)->Mass();
         }
         if ((*part)->PdgCode()==22){ClPartTrackIDs[1].push_back((*part)->TrackId());} // Gammas
         if ((*part)->PdgCode()==2112){ClPartTrackIDs[2].push_back((*part)->TrackId());} // Neutrons
         if ((*part)->PdgCode()!=11 && (*part)->PdgCode()!=22 && (*part)->PdgCode()!=2112){ClPartTrackIDs[3].push_back((*part)->TrackId());} // Others
-        // else {ClPartTrackIDs[3].push_back((*part)->TrackId()); std::cout << "TrackID " << (*part)->TrackId() << " going to rest" << std::endl;}
       }
     }
   }
-  else{std::cout << "No MARLEY MCTruths found." << std::endl;}
+  else{mf::LogWarning("SolarNuAna") << "No MARLEY MCTruths found.";}
+  PrintInColor(sNuTruth,GetColor("blue"));
   fMCTruthTree->Fill();
   
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //------------------------------------------------------------------- Optical Flash Analysis --------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // Find OpHits and OpFlashes associated with the event
@@ -402,7 +407,6 @@ void SolarNuAna::analyze(art::Event const & evt)
   
   // Grab assns with OpHits to get match to neutrino purity
   art::FindManyP< recob::OpHit > OpAssns(flashlist, evt, fOpFlashLabel);
-  std::cout << "\nTotal number of flashes constructed: " << flashlist.size() << std::endl;
 
   // Loop over flashlist and assign OpHits to each flash
   for ( int i = 0; i < int(flashlist.size()); i++ ){
@@ -410,7 +414,7 @@ void SolarNuAna::analyze(art::Event const & evt)
     recob::OpFlash TheFlash = *flashlist[i];
     // if (i%10 == 0) PrintInColor("Flash Time = " + str(TheFlash.Time()), GetColor("red"));
     std::vector< art::Ptr< recob::OpHit > > matchedHits = OpAssns.at(i);
-    mf::LogDebug("DAQSimAna") << "Assigning OpHit to Flash";
+    mf::LogDebug("SolarNuAna") << "Assigning OpHit to Flash";
     // Calculate the total PE of the flash and the time of the ophit with the highest PE 
     double totPE = 0; double MaxHitPE = 0;
     float OpHitT, OpHitPE;
@@ -424,12 +428,12 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
     }
 
-    mf::LogDebug("DAQSimAna") << "Evaluating Flash purity";
+    mf::LogDebug("SolarNuAna") << "Evaluating Flash purity";
     // Calculate the flash purity
     int TerminalOutput = supress_stdout();
     double OpFlashPur = pbt->OpHitCollectionPurity(signal_trackids, matchedHits);
     resume_stdout(TerminalOutput);
-    mf::LogDebug("DAQSimAna") << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT;
+    mf::LogDebug("SolarNuAna") << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT;
 
     // Calculate the flash purity, only for the Marley events
     if (MaxHitPE/totPE < fAdjOpFlashMaxPECut && totPE > fAdjOpFlashMinPECut){
@@ -443,11 +447,11 @@ void SolarNuAna::analyze(art::Event const & evt)
       OpFlashNHit.push_back(matchedHits.size());
     }
     if (abs(OpHitT) < 30){
-      mf::LogDebug("DAQSimAna") << "OpFlash PE (max/tot) " << MaxHitPE << "/" << TheFlash.TotalPE() << " with purity " << OpFlashPur << " time " << TheFlash.Time();
+      mf::LogDebug("SolarNuAna") << "OpFlash PE (max/tot) " << MaxHitPE << "/" << TheFlash.TotalPE() << " with purity " << OpFlashPur << " time " << TheFlash.Time();
     }
   }
 
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //---------------------------------------------------------------- Hit collection and assignment ----------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Lift out the reco hits:
@@ -459,17 +463,15 @@ void SolarNuAna::analyze(art::Event const & evt)
     
     recob::Hit const& ThisHit = reco_hits->at(hit);
     if (ThisHit.PeakTime() < 0) PrintInColor("Negative Hit Time = " + str(ThisHit.PeakTime()), GetColor("red"));
-    mf::LogDebug("DAQSimAna") << "Hit " << hit << " has view " << ThisHit.View() << " and signal type " << ThisHit.SignalType();
+    mf::LogDebug("SolarNuAna") << "Hit " << hit << " has view " << ThisHit.View() << " and signal type " << ThisHit.SignalType();
 
     if      (ThisHit.SignalType() == 0 && ThisHit.View() == 0){ColHits0.push_back( ThisHit );} // SignalType = 0
     else if (ThisHit.SignalType() == 0 && ThisHit.View() == 1){ColHits1.push_back( ThisHit );} // SignalType = 0
     else if (ThisHit.SignalType() == 1)                       {ColHits2.push_back( ThisHit );} // SignalType = 1
-    else    {ColHits3.push_back( ThisHit ); std::cout << "Hit was found with view out of scope" << std::endl;}
+    else    {ColHits3.push_back( ThisHit ); mf::LogError("SolarNuAna") << "Hit was found with view out of scope";}
   } 
 
-  std::cout << "# Hits in each view = " << ColHits0.size() << ", " << ColHits1.size() << ", " << ColHits2.size() << ", " << ColHits3.size() << std::endl;
-  
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //-------------------------------------------------------------- Cluster creation and analysis ------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Now calculate the clusters ...
@@ -478,14 +480,17 @@ void SolarNuAna::analyze(art::Event const & evt)
   CalcAdjHits(ColHits2,Clusters2,hAdjHits,hAdjHitsADCInt,false);
   CalcAdjHits(ColHits3,Clusters3,hAdjHits,hAdjHitsADCInt,false);
 
-  std::cout << "# Clusters from the hits = " << Clusters0.size() << ", " << Clusters1.size() << ", " << Clusters2.size() << ", " << Clusters3.size() << std::endl;
-  
   std::vector< std::vector< std::vector<float>>> ClGenPur = {{},{},{}};
   std::vector< std::vector< std::vector<recob::Hit>>> AllPlaneClusters = {Clusters0,Clusters1,Clusters2};
   std::vector< std::vector< float>> ClTotChrg = {{},{},{}}, ClMaxChrg = {{},{},{}}, CldT      = {{},{},{}}, ClT        = {{},{},{}}, ClX   = {{},{},{}}, ClY    = {{},{},{}}, ClZ = {{},{},{}};
   std::vector< std::vector< float>> ClFracE   = {{},{},{}}, ClFracGa  = {{},{},{}}, ClFracNe  = {{},{},{}}, ClFracRest = {{},{},{}}, ClPur = {{},{},{}}, Cldzdy = {{},{},{}};
   std::vector< std::vector< int  >> ClMainID  = {{},{},{}}, ClTPC     = {{},{},{}}, ClNHits   = {{},{},{}}, ClGen      = {{},{},{}};
 
+  std::string sRecoObjects = "";
+  sRecoObjects = sRecoObjects + "\nTotal number of flashes constructed: " + str(int(flashlist.size()));
+  sRecoObjects = sRecoObjects + "\n# Hits in each view = " + str(int(ColHits0.size())) + ", " + str(int(ColHits1.size())) + ", " + str(int(ColHits2.size())) + ", " + str(int(ColHits3.size()));
+  sRecoObjects = sRecoObjects + "\n# Clusters from the hits = " + str(int(Clusters0.size())) + ", " + str(int(Clusters1.size())) + ", " + str(int(Clusters2.size())) + ", " + str(int(Clusters3.size()));
+  PrintInColor(sRecoObjects,GetColor("cyan"));
   //------------------------------------------------------------ First complete cluster analysis ------------------------------------------------------------------// 
   // --- Now loop over the planes and the clusters to calculate the cluster properties
   for (int idx = 0; idx < 3; idx++){ 
@@ -530,7 +535,7 @@ void SolarNuAna::analyze(art::Event const & evt)
           if (ThisHitIDE[ideL].energyFrac > TopEFrac){
             TopEFrac = ThisHitIDE[ideL].energyFrac;
             MainTrID = ThisHitIDE[ideL].trackID; 
-            mf::LogDebug("DAQSimAna") << "This hit's IDE is: " << MainTrID; 
+            mf::LogDebug("SolarNuAna") << "This hit's IDE is: " << MainTrID; 
           }
         }
 
@@ -547,7 +552,7 @@ void SolarNuAna::analyze(art::Event const & evt)
         
         long unsigned int ThisPType = WhichParType(abs(MainTrID));
         GenPur[int(ThisPType)] = GenPur[int(ThisPType)] + hit.Integral();
-        mf::LogDebug("DAQSimAna") << "\nThis particle type " << ThisPType << "\nThis cluster's main track ID " << MainTrID;    
+        mf::LogDebug("SolarNuAna") << "\nThis particle type " << ThisPType << "\nThis cluster's main track ID " << MainTrID;    
         if (ThisPType == 1){hitCharge = hit.Integral();Pur = Pur+hitCharge;}
       }
 
@@ -559,12 +564,12 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
       // PrintInColor("Gen: "+ str(Gen), GetColor("red"));
 
-      for (size_t j = 0; j > thisdzdy.size(); j++) {if (thisdzdy[0] != thisdzdy[i]) std::cout << "MISSMATCH IN dzdy FOR CLUSTER " << idx << std::endl;}
+      for (size_t j = 0; j > thisdzdy.size(); j++) {if (thisdzdy[0] != thisdzdy[i]) mf::LogWarning("SolarNuAna") << "MISSMATCH IN dzdy FOR CLUSTER " << idx;}
 
       dzdy = thisdzdy[0]; thisdzdy.clear();      
       FracE /= ncharge; FracGa /= ncharge; FracNe /= ncharge; FracRest /= ncharge;
       clustTPC /= ncharge; clustX /= ncharge; clustY /= ncharge;clustZ /= ncharge;clustT /= ncharge;
-      mf::LogDebug("DAQSimAna") << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx; 
+      mf::LogDebug("SolarNuAna") << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx; 
       if (clustT < 0) PrintInColor("Negative Cluster Time = " + str(clustT), GetColor("red"));
 
       ClTotChrg[idx].push_back(ncharge);
@@ -585,13 +590,12 @@ void SolarNuAna::analyze(art::Event const & evt)
       ClMainID[idx].push_back(MainTrID);
       ClGenPur[idx].push_back(GenPur);
 
-      mf::LogDebug("DAQSimAna") << "\nCluster " << i << " in plane " << idx << " has #hits" << nhit << " charge, " << ncharge << " time, " << clustT;
-      mf::LogDebug("DAQSimAna") << " and position (" << clustY << ", " << clustZ << ") with main track ID " << MainTrID << " and purity " << Pur/ncharge;
+      mf::LogDebug("SolarNuAna") << "\nCluster " << i << " in plane " << idx << " has #hits" << nhit << " charge, " << ncharge << " time, " << clustT;
+      mf::LogDebug("SolarNuAna") << " and position (" << clustY << ", " << clustZ << ") with main track ID " << MainTrID << " and purity " << Pur/ncharge;
     }
   } // Finished first cluster processing
-  std::cout << "\nLooking for matching clusters: " << std::endl;
   
-  std::cout << std::endl;//-------------------------------------------------------------------- Cluster Matching -------------------------------------------------------------------------// 
+  //-------------------------------------------------------------------- Cluster Matching -------------------------------------------------------------------------// 
   std::vector<std::vector<float>> MVecGenFrac = {};
   std::vector<int>   MVecNHit  = {}, MVecGen    = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecTPC = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
   std::vector<float> MVecTime  = {}, MVecChrg   = {}, MVecInd0MaxHit = {}, MVecInd1MaxHit = {}, MVecInd0dT = {}, MVecInd1dT = {};
@@ -599,17 +603,12 @@ void SolarNuAna::analyze(art::Event const & evt)
   std::vector<float> MVecFracE = {}, MVecFracGa = {}, MVecFracNe = {}, MVecFracRest = {}, MVecPur = {};
 
   for (int ii = 0; ii < int(AllPlaneClusters[2].size()); ii++){
-    // std::cout << "Evaluating cluster " << ii << "out of " << int(AllPlaneClusters[2].size()) << std::endl;    
     bool match = false;
     int ind0clustNHits = 0, ind1clustNHits = 0;
     int ind0clustTPC = 0, ind1clustTPC = 0;
     double ind0clustY = -1e6, ind1clustY = -1e6, ind0clustMaxHit = 0, ind1clustMaxHit = 0;
     double ind0clustdT = fClusterMatchTime, ind1clustdT = fClusterMatchTime;
-    // std::cout << "Test" << std::endl;
     if (!AllPlaneClusters[2][ii].empty()){
-      // std::cout << "***Evaluating main cluster " << ii << " for size " <<  AllPlaneClusters[2][ii].size() << std::endl;
-      // std::cout << "This cluster's position is (" << ClY[2][ii] << ", " << ClZ[2][ii] << ") and its time is " << ClT[2][ii] << std::endl;
-
       if (!AllPlaneClusters[0].empty()){
         for (int jj = 0; jj < int(AllPlaneClusters[0].size()); jj++){
           if (abs(ClT[2][ii] - ClT[0][jj]) < fClusterMatchTime && abs(fGoalInd0MatchTime - abs(ClT[2][ii] - ClT[0][jj])) < abs(fGoalInd0MatchTime - ind0clustdT)){
@@ -619,8 +618,8 @@ void SolarNuAna::analyze(art::Event const & evt)
             ind0clustMaxHit = ClMaxChrg[0][jj];
             ind0clustTPC = ClTPC[0][jj];
             if (ind0clustY > -fMaxDetSizeY && ind0clustY < fMaxDetSizeY){match = true;}
-            // std::cout << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj] << std::endl;
-            // std::cout << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii] << std::endl;  
+            mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj];
+            mf::LogDebug("SolarNuAna") << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii];  
           }
         }
       }
@@ -633,13 +632,13 @@ void SolarNuAna::analyze(art::Event const & evt)
             ind1clustMaxHit = ClMaxChrg[1][zz];
             ind1clustTPC = ClTPC[1][zz];
             if (ind1clustY > -fMaxDetSizeY && ind1clustY < fMaxDetSizeY){match = true;}
-            // std::cout << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz] << std::endl;
-            // std::cout << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii] << std::endl;
+            mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz];
+            mf::LogDebug("SolarNuAna") << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii];
           }
         } // Loop over ind1 clusters
       }
     } // Loop over ind clusters
-    else {std::cout << "Cluster " << ii << " in plane 2 has no hits" << std::endl;}
+    else {mf::LogDebug("SolarNuAna") << "Cluster " << ii << " in plane 2 has no hits";}
     
     //--------------------------------------------------------- Export Matched cluster vectors ------------------------------------------------------------------// 
     if (match == true){
@@ -691,18 +690,18 @@ void SolarNuAna::analyze(art::Event const & evt)
       else{
         mf::LogDebug("SolarNuAna") << "RECO OUTSIDE OF DETECTOR";
         MVecRecY.push_back((ind0clustY+ind1clustY)/2); 
-        if (ClGen[2][ii] == 1){PrintInColor("Marley cluster reconstructed outside of detector volume! RecoY = " + str((ind0clustY+ind1clustY)/2), GetColor("red"));}
+        if (ClGen[2][ii] == 1){mf::LogWarning("SolarNuAna") << "Marley cluster reconstructed outside of detector volume! RecoY = " << str((ind0clustY+ind1clustY)/2);}
       }
 
       // Print in color if the cluster is matched
-      mf::LogDebug("DAQSimAna") << "¡¡¡ Matched cluster !!! ";
-      mf::LogDebug("DAQSimAna") << " - Cluster " << str(ClMainID[2][ii]) << " Gen " << str(ClGen[2][ii]) << " Purity " << str(ClPur[2][ii]) << " Hits " << str(ClNHits[2][ii]);
-      mf::LogDebug("DAQSimAna") << " - Hits(ind0, ind1, col) " << str(ind0clustNHits) << ", " << str(ind1clustNHits) << ", " << str(ClNHits[2][ii]);
-      mf::LogDebug("DAQSimAna") << " - Positions y(ind0, ind1) = " << str(ind0clustY) << ", " << str(ind1clustY) << ", z = " << str(ClZ[2][ii]) << "\n";
+      mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster !!! ";
+      mf::LogDebug("SolarNuAna") << " - Cluster " << str(ClMainID[2][ii]) << " Gen " << str(ClGen[2][ii]) << " Purity " << str(ClPur[2][ii]) << " Hits " << str(ClNHits[2][ii]);
+      mf::LogDebug("SolarNuAna") << " - Hits(ind0, ind1, col) " << str(ind0clustNHits) << ", " << str(ind1clustNHits) << ", " << str(ClNHits[2][ii]);
+      mf::LogDebug("SolarNuAna") << " - Positions y(ind0, ind1) = " << str(ind0clustY) << ", " << str(ind1clustY) << ", z = " << str(ClZ[2][ii]) << "\n";
     } // if (match == true)
   } // Loop over collection plane clusters
   
-  std::cout << std::endl;//-------------------------------------------------------------------- Cluster Tree Export -------------------------------------------------------------------------// 
+  //-------------------------------------------------------------------- Cluster Tree Export -------------------------------------------------------------------------// 
   // Loop over matched clusters and export to tree if number of hits is above threshold
   for (int i = 0; i < int(MVecNHit.size()); i++){
     if(MVecNHit[i] > fClusterMatchMinNHit && (MVecInd0NHits[i] > fClusterMatchMinNHit || MVecInd1NHits[i] > fClusterMatchMinNHit)){
@@ -711,12 +710,11 @@ void SolarNuAna::analyze(art::Event const & evt)
       MAdjFlashTime = {};MAdjFlashPE = {};MAdjFlashNHit = {};MAdjFlashMaxPE = {};MAdjFlashRecoY = {};MAdjFlashRecoZ = {};MAdjFlashR = {};MAdjFlashPur = {};
       
       std::string ResultColor = "white";
-      PrintInColor("*** Matched preselection cluster: ",GetColor("blue"));
-      if (abs(MVecRecY[i] - TNuY) < 10 && abs(MVecRecZ[i] - TNuZ) < 10) {ResultColor = "green";PrintInColor(" - Cluster is close to neutrino vertex!",GetColor(ResultColor));}
-      else {ResultColor = "yellow";PrintInColor(" - Cluster is NOT close to neutrino vertex!",GetColor(ResultColor));}
+      if (abs(MVecRecY[i] - TNuY) < 10 && abs(MVecRecZ[i] - TNuZ) < 10) {ResultColor = "green";}
+      else {ResultColor = "yellow";}
 
-      PrintInColor(" - Cluster " + str(MVecMainID[i]) + " Gen " + str(MVecGen[i]) + " Purity " + str(MVecPur[i]) + " Hits " + str(MVecNHit[i]), GetColor(ResultColor));
-      PrintInColor(" - RecoY, Z (" + str(MVecRecY[i]) + ", " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
+      PrintInColor("*** Matched preselection cluster: \n - MainCluster  " + str(MVecMainID[i]) + " Gen " + str(MVecGen[i]) + " Purity " + str(MVecPur[i]) + " Hits " + str(MVecNHit[i])
+        + "\n - RecoY/RecoZ (" + str(MVecRecY[i]) + " / " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
 
       // Loop over collection plane clusters to find adjacent clusters with distance < fAdjClusterRad and time < fAdjClusterTime
       for (int j = 0; j < int(MVecNHit.size()); j++){
@@ -737,7 +735,6 @@ void SolarNuAna::analyze(art::Event const & evt)
           MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
           resume_stdout(TerminalOutput);
           if (MAdjClTruth == 0) {
-            // PrintInColor("MAdjClTruth == 0",GetColor("red"));
             MAdjClMainPDG.push_back(0);          
             MAdjClMainE.push_back(-1e6);
             MAdjClMainX.push_back(-1e6);
@@ -745,7 +742,6 @@ void SolarNuAna::analyze(art::Event const & evt)
             MAdjClMainZ.push_back(-1e6);
           }
           else{
-            // PrintInColor("MAdjClTruth->Mother()"+str(MAdjClTruth->Mother()),GetColor("blue"));
             MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
             MAdjClMainE.push_back(MAdjClTruth->E());
             MAdjClMainX.push_back(MAdjClTruth->Vx());
@@ -799,7 +795,6 @@ void SolarNuAna::analyze(art::Event const & evt)
       MClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[i]);
       resume_stdout(TerminalOutput);
       if (MClTruth == 0){
-        // PrintInColor("MClTruth == 0",GetColor("red"));
         MMainVertex = {-1e6,-1e6,-1e6};
         MMainPDG =       0;
         MMainE =      -1e6;
@@ -813,7 +808,6 @@ void SolarNuAna::analyze(art::Event const & evt)
         MMainParentP =      -1e6;
       }
       else{
-        // PrintInColor("MClTruth->Mother() "+str(MClTruth->Mother()),GetColor("blue"));
         MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
         MMainPDG =    MClTruth->PdgCode();
         MMainE =      MClTruth->E();
@@ -825,7 +819,6 @@ void SolarNuAna::analyze(art::Event const & evt)
         MClParentTruth = pi_serv->TrackIdToParticle_P(MClTruth->Mother());
         resume_stdout(TerminalOutput);
         if (MClParentTruth == 0){
-          // PrintInColor("MClParentTruth == 0",GetColor("red"));
           MMainParentVertex = {-1e6,-1e6,-1e6};
           MMainParentPDG =       0;
           MMainParentE =      -1e6;
@@ -833,7 +826,6 @@ void SolarNuAna::analyze(art::Event const & evt)
           MMainParentP =      -1e6;
         }
         else{
-          // PrintInColor("MClParentTruth->Mother() "+str(MClParentTruth->Mother()),GetColor("blue"));
           MMainParentVertex = {MClParentTruth->Vx(),MClParentTruth->Vy(),MClParentTruth->Vz()};
           MMainParentPDG =    MClParentTruth->PdgCode();
           MMainParentE =      MClParentTruth->E();
@@ -847,10 +839,9 @@ void SolarNuAna::analyze(art::Event const & evt)
       hXTruth->         Fill(MVecRecY[i]-TNuY,TNuX); 
       hYTruth->         Fill(MVecRecY[i]-TNuY,TNuY); 
       hZTruth->         Fill(MVecRecZ[i]-TNuZ,TNuZ); 
-      if (MVecTime[i]<0) std::cout << "Negative Main Cluster Time = " << MVecTime[i] << std::endl;
+      if (MVecTime[i]<0) mf::LogWarning("SolarNuAna") << "Negative Main Cluster Time = " << MVecTime[i];
     }
   }
-  std::cout << std::endl;
 }
 
 //########################################################################################################################################//
@@ -1026,7 +1017,7 @@ void SolarNuAna::FillMyMaps( std::map< int, simb::MCParticle> &MyMap, art::FindM
     for ( size_t L2=0; L2 < Assn.at(L1).size(); ++L2 ) {
       const simb::MCParticle ThisPar = (*Assn.at(L1).at(L2));
       MyMap[ThisPar.TrackId()] = ThisPar;
-      mf::LogDebug("DAQSimAna") << ThisPar.PdgCode() << " " << ThisPar.E();
+      mf::LogDebug("SolarNuAna") << ThisPar.PdgCode() << " " << ThisPar.E();
     }
   }
   return;
@@ -1044,8 +1035,10 @@ bool SolarNuAna::InMyMap( int TrID, std::map< int, simb::MCParticle> ParMap ){
 
 //......................................................
 // This function creates a terminal color printout
-void SolarNuAna::PrintInColor( std::string MyString, int Color ){
-  std::cout << "\033[" << Color << "m" << MyString << "\033[0m" << std::endl;
+void SolarNuAna::PrintInColor( std::string MyString, int Color, std::string Type ){
+  if (Type == "Info"){mf::LogInfo("SolarNuAna") << "\033[" << Color << "m" << MyString << "\033[0m";}
+  if (Type == "Degub"){mf::LogDebug("SolarNuAna") << "\033[" << Color << "m" << MyString << "\033[0m";}
+  if (Type == "Error"){mf::LogError("SolarNuAna") << "\033[" << Color << "m" << MyString << "\033[0m";}
   return;
 }
 
@@ -1060,7 +1053,7 @@ int SolarNuAna::GetColor( std::string ColorName ){
   else if (ColorName == "magenta") return 35;
   else if (ColorName == "cyan") return 36;
   else if (ColorName == "white") return 37;
-  else {std::cout << "Color " << ColorName << " not recognized. Returning white." << std::endl; return 37;}
+  else {mf::LogError("SolarNuAna") << "Color " << ColorName << " not recognized. Returning white."; return 37;}
   return 0;
 }
 

@@ -54,4 +54,7 @@ services.Geometry.GDML: "dunevd10kt_3view_30deg_v4_refactored_1x8x14ref.gdml"
 services.Geometry.Name: "dunevd10kt_3view_30deg_v4_refactored_1x8x14ref"
 services.Geometry.ROOT: "dunevd10kt_3view_30deg_v4_refactored_1x8x14ref.gdml"
 
+services.message.destinations.LogStandardOut.threshold: "INFO"
+services.message.destinations.LogStandardOut.type: "cout"
+
 # physics.analyzers.daqanafasth.HitLabel: "fasthit"	# string for the process that made the fast hits
