@@ -1053,6 +1053,14 @@ int SolarNuAna::GetColor( std::string ColorName ){
   else if (ColorName == "magenta") return 35;
   else if (ColorName == "cyan") return 36;
   else if (ColorName == "white") return 37;
+  else if (ColorName == "bright_black") return 90;
+  else if (ColorName == "bright_red") return 91;
+  else if (ColorName == "bright_green") return 92;
+  else if (ColorName == "bright_yellow") return 93;
+  else if (ColorName == "bright_blue") return 94;
+  else if (ColorName == "bright_magenta") return 95;
+  else if (ColorName == "bright_cyan") return 96;
+  else if (ColorName == "bright_white") return 97;
   else {mf::LogError("SolarNuAna") << "Color " << ColorName << " not recognized. Returning white."; return 37;}
   return 0;
 }
