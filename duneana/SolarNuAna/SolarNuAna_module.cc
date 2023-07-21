@@ -90,7 +90,8 @@ private:
   TTree* fSolarNuAnaTree;
   TTree* fMCTruthTree;
   std::string MGenLabel;
-  int Run,SubRun,Event,Flag,MNHit,MGen,MTPC,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
+  // trj removed Run and SubRun as they are unused and clang complained
+  int Event,Flag,MNHit,MGen,MTPC,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
   float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP,MMainParentE,MMainParentP,MMainParentT;
   std::vector<int> MAdjClGen,MAdjClMainID,TPart,MarleyPDGList,MarleyIDList,MarleyParentIDList,MAdjClMainPDG;
   std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainE,MAdjClMainX,MAdjClMainY,MAdjClMainZ,MMarleyFrac,MGenFrac;
