@@ -19,7 +19,7 @@
 #include "TTree.h"
 #include "TVector3.h"
 #include "TRandom.h"
-// #include "DisplacementVector3D.h"
+#include <fcntl.h>
 
 // Framework includes (not all might be necessary)
 #include "larcore/Geometry/Geometry.h"
@@ -68,32 +68,36 @@ private:
   bool              InMyMap       ( int TrID, std::map< int, simb::MCParticle> ParMap );
   void              FillMyMaps    ( std::map< int, simb::MCParticle> &MyMap, art::FindManyP<simb::MCParticle> Assn, art::ValidHandle< std::vector<simb::MCTruth> > Hand );
   void              CalcAdjHits   ( std::vector< recob::Hit > MyVec,std::vector< std::vector<recob::Hit> >& Clusters,TH1I* MyHist, TH1F* MyADCIntHist, bool HeavDebug );
-  void              PrintInColor  ( std::string MyString, int MyColor );
+  void              PrintInColor  ( std::string MyString, int MyColor, std::string Type = "Info");
   int               GetColor      ( std::string MyString );
   std::string       str           ( int MyInt );
   std::string       str           ( float MyFloat );
   std::string       str           ( double MyDouble );
-  
+  std::string       str           ( std::vector<int> MyVec );
+  std::string       str           ( std::vector<float> MyVec );
+  std::string       str           ( std::vector<double> MyVec );
+  int supress_stdout();
+  void resume_stdout(int fd);
   // --- Our fcl parameter labels for the modules that made the data products
   std::string fRawDigitLabel,fHitLabel,fOpHitLabel,fOpDetWaveformLabel,fOpFlashLabel,fGEANTLabel; 
 
   // --- Input settings imported from the fcl
-  std::string sPositionReco;
   std::vector<std::string> fLabels;
   int fMaxDetSizeY, fClusterMatchMinNHit, fGoalInd0MatchTime, fGoalInd1MatchTime;
-  float fClusterMatchTime,fAdjClusterTime,fAdjClusterRad,fAdjOpFlashRad,fAdjOpFlashTime,fAdjOpFlashMaxPECut;
-  bool fTestNewClReco, fDebug;
+  float fClusterMatchTime,fAdjClusterTime,fAdjClusterRad,fAdjOpFlashRad,fAdjOpFlashTime,fAdjOpFlashMaxPECut,fAdjOpFlashMinPECut;
   
   // --- Our TTrees, and its associated variables.
   TTree* fSolarNuAnaTree;
   TTree* fMCTruthTree;
   std::string MGenLabel;
-  int Run,SubRun,Event,Flag,MNHit,MGen,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID;
-  float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur;
-  std::vector<int> MAdjClGen,TPart,MarleyPDGList,MarleyIDList,MarleyParentIDList;
-  std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MPartFrac;
+  // trj removed Run and SubRun as they are unused and clang complained
+  int Event,Flag,MNHit,MGen,MTPC,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
+  float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP,MMainParentE,MMainParentP,MMainParentT;
+  std::vector<int> MAdjClGen,MAdjClMainID,TPart,MarleyPDGList,MarleyIDList,MarleyParentIDList,MAdjClMainPDG;
+  std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainE,MAdjClMainX,MAdjClMainY,MAdjClMainZ,MMarleyFrac,MGenFrac;
   std::vector<float> MAdjFlashTime,MAdjFlashPE,MAdjFlashNHit,MAdjFlashMaxPE,MAdjFlashRecoY,MAdjFlashRecoZ,MAdjFlashR,MAdjFlashPur;
-  std::vector<float> MarleyEList, MarleyPList, MarleyXList, MarleyYList, MarleyZList;
+  std::vector<float> MarleyEList,MarleyPList,MarleyXList,MarleyYList,MarleyZList;
+  std::vector<double> MMainVertex,MMainParentVertex;
   std::vector<std::map<int,simb::MCParticle>> Parts = {};
   
   // --- OpFlash Variables
@@ -128,7 +132,6 @@ void SolarNuAna::reconfigure(fhicl::ParameterSet const & p){
   fOpHitLabel         = p.get<std::string>  ("OpHitLabel");
   fGEANTLabel         = p.get<std::string>  ("GEANT4Label");
 
-  sPositionReco        = p.get<std::string> ("PositionRecoMode","DEFAULT");
   fMaxDetSizeY         = p.get<int>         ("DetectorSizeY");
   fClusterMatchMinNHit = p.get<int>         ("ClusterMatchMinNHit");
   fClusterMatchTime    = p.get<float>       ("ClusterMatchTime");
@@ -139,8 +142,7 @@ void SolarNuAna::reconfigure(fhicl::ParameterSet const & p){
   fAdjOpFlashTime      = p.get<float>       ("AdjOpFlashTime");
   fAdjOpFlashRad       = p.get<float>       ("AdjOpFlashRad");
   fAdjOpFlashMaxPECut  = p.get<float>       ("AdjOpFlashMaxPECut");
-  fTestNewClReco       = p.get<bool>        ("TestNewClReco",false);
-  fDebug               = p.get<bool>        ("Debug",false);
+  fAdjOpFlashMinPECut  = p.get<float>       ("AdjOpFlashMinPECut");
 } // Reconfigure
 
 //......................................................
@@ -151,8 +153,8 @@ void SolarNuAna::beginJob(){
   fSolarNuAnaTree = tfs->make<TTree>("SolarNuAnaTree","Solar Ana Tree");
 
   // MC Truth info.
-  fMCTruthTree -> Branch("Run",               &Run,              "Run/I");
-  fMCTruthTree -> Branch("SubRun",            &SubRun,           "SubRun/I");
+  // fMCTruthTree -> Branch("Run",               &Run,              "Run/I");
+  // fMCTruthTree -> Branch("SubRun",            &SubRun,           "SubRun/I");
   fMCTruthTree -> Branch("Event",             &Event,            "Event/I");
   fMCTruthTree -> Branch("Flag",              &Flag,             "Flag/I");          // Flag used to match truth with reco tree entries
   fMCTruthTree -> Branch("TruthPart",         &TPart);                               // Number particles per generator
@@ -172,46 +174,58 @@ void SolarNuAna::beginJob(){
   fMCTruthTree -> Branch("TMarleyParentID",   &MarleyParentIDList);                  // ParentID of marley particles
 
   // Repeated Truth info.
-  fSolarNuAnaTree -> Branch("Run",            &Run,              "Run/I");
-  fSolarNuAnaTree -> Branch("SubRun",         &SubRun,           "SubRun/I");
-  fSolarNuAnaTree -> Branch("Event",          &Event,            "Event/I");
-  fSolarNuAnaTree -> Branch("Flag",           &Flag,             "Flag/I");          // Flag used to match truth with reco tree entries
-  fSolarNuAnaTree -> Branch("TruthPart",      &TPart);                               // Number particles per generator
-  fSolarNuAnaTree -> Branch("TNuQSqr",        &TNuQSqr,          "TruthNuQSqr/F");   // True neutrino transfer momentum [GeV]
-  fSolarNuAnaTree -> Branch("TNuE",           &TNuE,             "TruthNuE/F");      // True neutrino energy
-  fSolarNuAnaTree -> Branch("TNuP",           &TNuP,             "TruthNuP/F");      // True neutrino momentum
-  fSolarNuAnaTree -> Branch("TNuX",           &TNuX,             "TruthNuX/F");      // True neutrino X
-  fSolarNuAnaTree -> Branch("TNuY",           &TNuY,             "TruthNuY/F");      // True neutrino Y
-  fSolarNuAnaTree -> Branch("TNuZ",           &TNuZ,             "TruthNuZ/F");      // True neutrino Z
-  fSolarNuAnaTree -> Branch("TMarleyPDG",     &MarleyPDGList);                       // PDG of marley particles
-  fSolarNuAnaTree -> Branch("TMarleyE",       &MarleyEList);                         // Energy of marley particles
-  fSolarNuAnaTree -> Branch("TMarleyP",       &MarleyPList);                         // Momentum of marley particles
-  fSolarNuAnaTree -> Branch("TMarleyX",       &MarleyXList);                         // X of marley particles
-  fSolarNuAnaTree -> Branch("TMarleyY",       &MarleyYList);                         // Y of marley particles
-  fSolarNuAnaTree -> Branch("TMarleyZ",       &MarleyZList);                         // Z of marley particles
-  fSolarNuAnaTree -> Branch("TMarleyID",      &MarleyIDList);                        // TrackID of marley particles")
-  fSolarNuAnaTree -> Branch("TMarleyParentID",&MarleyParentIDList);                  // ParentID of marley particles
+  // fSolarNuAnaTree -> Branch("Run",            &Run,              "Run/I");
+  // fSolarNuAnaTree -> Branch("SubRun",         &SubRun,           "SubRun/I");
+  fSolarNuAnaTree -> Branch("Event",           &Event,            "Event/I");
+  fSolarNuAnaTree -> Branch("Flag",            &Flag,             "Flag/I");          // Flag used to match truth with reco tree entries
+  fSolarNuAnaTree -> Branch("TruthPart",       &TPart);                               // Number particles per generator
+  fSolarNuAnaTree -> Branch("TNuQSqr",         &TNuQSqr,          "TruthNuQSqr/F");   // True neutrino transfer momentum [GeV]
+  fSolarNuAnaTree -> Branch("TNuE",            &TNuE,             "TruthNuE/F");      // True neutrino energy
+  fSolarNuAnaTree -> Branch("TNuP",            &TNuP,             "TruthNuP/F");      // True neutrino momentum
+  fSolarNuAnaTree -> Branch("TNuX",            &TNuX,             "TruthNuX/F");      // True neutrino X
+  fSolarNuAnaTree -> Branch("TNuY",            &TNuY,             "TruthNuY/F");      // True neutrino Y
+  fSolarNuAnaTree -> Branch("TNuZ",            &TNuZ,             "TruthNuZ/F");      // True neutrino Z
+  fSolarNuAnaTree -> Branch("TMarleyPDG",      &MarleyPDGList);                       // PDG of marley particles
+  fSolarNuAnaTree -> Branch("TMarleyE",        &MarleyEList);                         // Energy of marley particles
+  fSolarNuAnaTree -> Branch("TMarleyP",        &MarleyPList);                         // Momentum of marley particles
+  fSolarNuAnaTree -> Branch("TMarleyX",        &MarleyXList);                         // X of marley particles
+  fSolarNuAnaTree -> Branch("TMarleyY",        &MarleyYList);                         // Y of marley particles
+  fSolarNuAnaTree -> Branch("TMarleyZ",        &MarleyZList);                         // Z of marley particles
+  fSolarNuAnaTree -> Branch("TMarleyID",       &MarleyIDList);                        // TrackID of marley particles")
+  fSolarNuAnaTree -> Branch("TMarleyParentID", &MarleyParentIDList);                  // ParentID of marley particles
   
   // Main Cluster info.
-  fSolarNuAnaTree -> Branch("Generator",      &MGen,             "Generator/I");     // Main cluster generator idx  
-  fSolarNuAnaTree -> Branch("Time",           &MTime,            "ColTime/F");       // Main cluster time [ticks]
-  fSolarNuAnaTree -> Branch("Charge",         &MChrg,            "ColCharge/F");     // Main cluster charge [ADC*ticks]
-  fSolarNuAnaTree -> Branch("NHits",          &MNHit,            "ColNHits/I");      // Main cluster #hits
-  fSolarNuAnaTree -> Branch("Ind0TPC",        &MInd0TPC,         "Ind0TPC/I");       // Main cluster ind0 TPC
-  fSolarNuAnaTree -> Branch("Ind1TPC",        &MInd1TPC,         "Ind1TPC/I");       // Main cluster ind1 TPC  
-  fSolarNuAnaTree -> Branch("Ind0NHits",      &MInd0NHits,       "Ind0NHits/I");     // Main cluster ind0 Hits
-  fSolarNuAnaTree -> Branch("Ind1NHits",      &MInd1NHits,       "Ind1NHits/I");     // Main cluster ind1 Hits
-  fSolarNuAnaTree -> Branch("Ind0MaxHit",     &MInd0MaxHit,      "Ind0MaxHit/F");    // Main cluster ind0 MaxHit
-  fSolarNuAnaTree -> Branch("Ind1MaxHit",     &MInd1MaxHit,      "Ind1MaxHit/F");    // Main cluster ind1 MaxHit
-  fSolarNuAnaTree -> Branch("Ind0dT",         &MInd0dT,          "Ind0dT/F");        // Main cluster ind0 DT [Ticks]
-  fSolarNuAnaTree -> Branch("Ind1dT",         &MInd1dT,          "Ind1dT/F");        // Main cluster ind1 DT [Ticks]
-  fSolarNuAnaTree -> Branch("Ind0RecoY",      &MInd0RecoY,       "Ind0RecoY/F");     // Main cluster ind0 reco Y [cm]
-  fSolarNuAnaTree -> Branch("Ind1RecoY",      &MInd1RecoY,       "Ind1RecoY/F");     // Main cluster ind1 reco Y [cm]
-  fSolarNuAnaTree -> Branch("MainID",         &MMainID,          "MainID/I");        // Main cluster main track ID
-  fSolarNuAnaTree -> Branch("RecoZ",          &MRecZ,            "RecoZ/F");         // Main cluster reco Z [cm]
-  fSolarNuAnaTree -> Branch("Purity",         &MPur,             "Purity/F");        // Main cluster reco purity
-  fSolarNuAnaTree -> Branch("PartFrac",       &MPartFrac);                           // Main cluster particle contribution (electron, gamma, neutron)
-  // fSolarNuAnaTree -> Branch("Label",          &MGenLabel);                           // Main cluster generator label  
+  fSolarNuAnaTree -> Branch("Generator",        &MGen,             "Generator/I");     // Main cluster generator idx  
+  fSolarNuAnaTree -> Branch("Purity",           &MPur,             "Purity/F");        // Main cluster reco purity
+  fSolarNuAnaTree -> Branch("Time",             &MTime,            "ColTime/F");       // Main cluster time [ticks]
+  fSolarNuAnaTree -> Branch("Charge",           &MChrg,            "ColCharge/F");     // Main cluster charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("NHits",            &MNHit,            "ColNHits/I");      // Main cluster #hits
+  fSolarNuAnaTree -> Branch("TPC",              &MTPC,             "ColTPC/I");        // Main cluster TPC
+  fSolarNuAnaTree -> Branch("Ind0TPC",          &MInd0TPC,         "Ind0TPC/I");       // Main cluster ind0 TPC
+  fSolarNuAnaTree -> Branch("Ind1TPC",          &MInd1TPC,         "Ind1TPC/I");       // Main cluster ind1 TPC  
+  fSolarNuAnaTree -> Branch("Ind0NHits",        &MInd0NHits,       "Ind0NHits/I");     // Main cluster ind0 Hits
+  fSolarNuAnaTree -> Branch("Ind1NHits",        &MInd1NHits,       "Ind1NHits/I");     // Main cluster ind1 Hits
+  fSolarNuAnaTree -> Branch("Ind0MaxHit",       &MInd0MaxHit,      "Ind0MaxHit/F");    // Main cluster ind0 MaxHit
+  fSolarNuAnaTree -> Branch("Ind1MaxHit",       &MInd1MaxHit,      "Ind1MaxHit/F");    // Main cluster ind1 MaxHit
+  fSolarNuAnaTree -> Branch("Ind0dT",           &MInd0dT,          "Ind0dT/F");        // Main cluster ind0 DT [Ticks]
+  fSolarNuAnaTree -> Branch("Ind1dT",           &MInd1dT,          "Ind1dT/F");        // Main cluster ind1 DT [Ticks]
+  fSolarNuAnaTree -> Branch("Ind0RecoY",        &MInd0RecoY,       "Ind0RecoY/F");     // Main cluster ind0 reco Y [cm]
+  fSolarNuAnaTree -> Branch("Ind1RecoY",        &MInd1RecoY,       "Ind1RecoY/F");     // Main cluster ind1 reco Y [cm]
+  fSolarNuAnaTree -> Branch("RecoZ",            &MRecZ,            "RecoZ/F");         // Main cluster reco Z [cm]
+  fSolarNuAnaTree -> Branch("MainID",           &MMainID,          "MainID/I");        // Main cluster main track ID
+  fSolarNuAnaTree -> Branch("MainT",            &MMainT,           "MainT/I");         // Main cluster main time [ticks]
+  fSolarNuAnaTree -> Branch("MainE",            &MMainE,           "MainE/F");         // Main cluster main energy [GeV]
+  fSolarNuAnaTree -> Branch("MainP",            &MMainP,           "MainP/F");         // Main cluster main momentum [GeV]
+  fSolarNuAnaTree -> Branch("MainPDG",          &MMainPDG,         "MainPDG/I");       // Main cluster main pdg
+  fSolarNuAnaTree -> Branch("MainParentPDG",    &MMainParentPDG,   "MainParentPDG/I"); // Main cluster main pdg
+  fSolarNuAnaTree -> Branch("MainParentE",      &MMainParentE,     "MainParentE/F");   // Main cluster main parent energy [GeV]
+  fSolarNuAnaTree -> Branch("MainParentP",      &MMainParentP,     "MainParentP/F");   // Main cluster main parent momentum [GeV]
+  fSolarNuAnaTree -> Branch("MainParentT",      &MMainParentT,     "MainParentT/F");   // Main cluster main parent Time [ticks]
+  fSolarNuAnaTree -> Branch("MainVertex",       &MMainVertex);                         // Main cluster main particle vertex [cm]
+  fSolarNuAnaTree -> Branch("MainParentVertex", &MMainParentVertex);                   // Main cluster main particle vertex [cm]
+  fSolarNuAnaTree -> Branch("GenFrac",          &MGenFrac);                            // Main cluster reco purity complete
+  fSolarNuAnaTree -> Branch("MarleyFrac",       &MMarleyFrac);                         // Main cluster particle contribution (electron, gamma, neutron)
+  // fSolarNuAnaTree -> Branch("Label",          &MGenLabel);                          // Main cluster generator label  
       
   // Adj. Cluster info.
   fSolarNuAnaTree -> Branch("AdjClGen",       &MAdjClGen);                           // Adj. clusters' generator idx
@@ -222,7 +236,13 @@ void SolarNuAna::beginJob(){
   fSolarNuAnaTree -> Branch("AdjClRecoZ",     &MAdjClRecoZ);                         // Adj. clusters' reco Z [cm]
   fSolarNuAnaTree -> Branch("AdjClPur",       &MAdjClPur);                           // Adj. clusters' purity
   fSolarNuAnaTree -> Branch("AdjClR",         &MAdjClR);                             // Adj. clusters' distance [cm]
-
+  fSolarNuAnaTree -> Branch("AdjClMainID",    &MAdjClMainID);                        // Adj. clusters' main track ID
+  fSolarNuAnaTree -> Branch("AdjClMainPDG",   &MAdjClMainPDG);                       // Adj. clusters' main PDG
+  fSolarNuAnaTree -> Branch("AdjClMainE",     &MAdjClMainE);                         // Adj. clusters' main energy [GeV]
+  fSolarNuAnaTree -> Branch("AdjClMainX",     &MAdjClMainX);                         // Adj. clusters' main X [cm]
+  fSolarNuAnaTree -> Branch("AdjClMainY",     &MAdjClMainY);                         // Adj. clusters' main Y [cm]
+  fSolarNuAnaTree -> Branch("AdjClMainZ",     &MAdjClMainZ);                         // Adj. clusters' main Z [cm]
+  
   // Adj. Flash info.
   fSolarNuAnaTree -> Branch("AdjOpFlashTime", &MAdjFlashTime);                       // Adj. flash' time [ticks]
   fSolarNuAnaTree -> Branch("AdjOpFlashPE",   &MAdjFlashPE);                         // Adj. flash' tot #PE [ADC*ticks]
@@ -238,7 +258,6 @@ void SolarNuAna::beginJob(){
   hXTruth         = tfs->make<TH2F>("hXTruth", "Missmatch in Y distance; Distance [cm]; True X position [cm]", 100, -600, 600, 100, -600, 600);
   hYTruth         = tfs->make<TH2F>("hYTruth", "Missmatch in Y distance; Distance [cm]; True Y position [cm]", 100, -600, 600, 100, -600, 600);
   hZTruth         = tfs->make<TH2F>("hZTruth", "Missmatch in Y distance; Distance [cm]; True Z position [cm]", 100, -600, 600, 100, 0, 1600);
-  
   hAdjHits        = tfs->make<TH1I>("hAdjHits", "Number of adjacent collection plane hits; Number of adjacent collection plane hits; Number of events"  , 21, -0.5, 20.5 );
   hAdjHitsADCInt  = tfs->make<TH1F>("hAdjHitsADCInt", "Total summed ADC Integrals for clusters; Total summed ADC Integrals for clusters; Number of events"  , 1000, 0, 10000 );
 } // BeginJob
@@ -259,110 +278,124 @@ void SolarNuAna::analyze(art::Event const & evt)
   ResetVariables();
   ThisGeneratorParts.clear();
   
-  Run = evt.run();SubRun = evt.subRun();Event = evt.event();
+  // Run = evt.run();SubRun = evt.subRun();
+  Event = evt.event();
   auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
   
   Flag = rand() % 10000000000;
-  std::cout << "\nTPC Frequency in [MHz]: " << clockData.TPCClock().Frequency() << std::endl;
-  std::cout << "TPC Tick in [us]: " << clockData.TPCClock().TickPeriod() << std::endl;
-  std::cout << "Used Flag: " << Flag << std::endl;
-  std::cout << "\nSuccesfull reset of variables for evt " << Event << " run " << Run << std::endl << "########################################" << std::endl;
-  
-  std::cout << std::endl; //---------------------------------------------------------------------------------------------------------------------------------------//
+  std::string sHead = "";
+  sHead = sHead + "\nTPC Frequency in [MHz]: " + str(clockData.TPCClock().Frequency());
+  sHead = sHead + "\nTPC Tick in [us]: " + str(clockData.TPCClock().TickPeriod());
+  sHead = sHead + "\nEvent Flag: " + str(Flag);
+  sHead = sHead + "\nSuccesfull reset of variables for evt " + str(Event);
+  sHead = sHead + "\n#########################################";
+  PrintInColor(sHead,GetColor("magenta"));
+  //---------------------------------------------------------------------------------------------------------------------------------------//
   //----------------------------------------------------------------- Create maps for ID tracking -----------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Fill MC Truth IDs to tracking vectors. Get a list of all of my particles in one chunk. ---  
   const sim::ParticleList& PartList = pi_serv->ParticleList();
-  std::cout << "There are a total of " << PartList.size() << " Particles in the event\n";
+  std::string sMcTruth = "";
+  sMcTruth = sMcTruth + "\nThere are a total of " + str(int(PartList.size())) + " Particles in the event\n";
   
   // Loop over all signal+bkg handles and collect track IDs
   for ( size_t i = 0; i < fLabels.size(); i++){
-    auto True = evt.getValidHandle<std::vector<simb::MCTruth>>(fLabels[i]); // Get generator handles
-    art::FindManyP<simb::MCParticle> Assn(True,evt,fGEANTLabel);            // Assign labels to MCPArticles
     Parts.push_back(ThisGeneratorParts);                                    // For each label insert empty list
-    FillMyMaps( Parts[i], Assn, True);                                      // Fill empty list with previously assigned particles                                       
-
-    // Print signal+bkg info to terminal
-    if (Parts[i].size() < 1000){std::cout << "# of particles " << Parts[i].size() << "\tfrom " << fLabels[i] << std::endl;}
-    else {std::cout << "# of particles " << Parts[i].size() << "\tfrom " << fLabels[i] << std::endl;}
-    TPart.push_back(Parts[i].size()); // Insert #signal+bkg particles generated
-  }
-  
-  // Finally loop again over labels and colllect corresponding IDs
-  for (size_t i = 0; i < fLabels.size(); i++){
-    for ( std::map<int,simb::MCParticle>::iterator iter = Parts[i].begin(); iter != Parts[i].end(); iter++ ){
+    
+    art::Handle<std::vector<simb::MCTruth>> ThisHandle;
+    evt.getByLabel(fLabels[i], ThisHandle);
+    
+    if(ThisHandle){
+      auto ThisValidHanlde = evt.getValidHandle<std::vector<simb::MCTruth>>(fLabels[i]); // Get generator handles
+      art::FindManyP<simb::MCParticle> Assn(ThisValidHanlde,evt,fGEANTLabel);            // Assign labels to MCPArticles
+      FillMyMaps( Parts[i], Assn, ThisValidHanlde);                                      // Fill empty list with previously assigned particles                                       
+      if (Parts[i].size() < 1000){sMcTruth = sMcTruth + "\n# of particles " + str(int(Parts[i].size())) + "\tfrom " + fLabels[i];} // Print signal+bkg info to terminal
+      else {sMcTruth = sMcTruth + "\n# of particles " + str(int(Parts[i].size())) + "\tfrom " + fLabels[i];}
+      TPart.push_back(Parts[i].size()); // Insert #signal+bkg particles generated
+      for ( std::map<int,simb::MCParticle>::iterator iter = Parts[i].begin(); iter != Parts[i].end(); iter++ ){
+        std::set<int> ThisGeneratorIDs = {};
+        trackids.push_back(ThisGeneratorIDs);
+        trackids[i].insert( iter->first );// Contains a list of TrIDs
+      }
+    } 
+    else{
+      sMcTruth = sMcTruth + "\n# of particles " + str(int(Parts[i].size())) + "\tfrom " + fLabels[i] + " *not generated!";
+      TPart.push_back(0);
       std::set<int> ThisGeneratorIDs = {};
       trackids.push_back(ThisGeneratorIDs);
-      trackids[i].insert( iter->first );// Contains a list of TrIDs
     }
   }
+  PrintInColor(sMcTruth,GetColor("yellow"));
 
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //----------------------------------------------------------------- Some MC Truth information -------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
-  art::Handle<std::vector<simb::MCTruth>> mctruths;
-  evt.getByLabel(fLabels[0], mctruths);
-
-  // --- Loop over all neutrinos in the event ---
-  for (auto const &MARLEYtruth : *mctruths){ 
-    const simb::MCNeutrino &nue = MARLEYtruth.GetNeutrino();
-    TNuQSqr = nue.QSqr();
-    TNuE =    nue.Nu().E();
-    TNuP =    nue.Nu().Pt();
-    TNuX =    nue.Nu().Vx();
-    TNuY =    nue.Nu().Vy();
-    TNuZ =    nue.Nu().Vz();
-    int N =   MARLEYtruth.NParticles(); 
-    std::cout << "Number of Neutrino Daughters: " << N-2 << std::endl; 
-    std::cout << "Neutrino energy: " << TNuE << " GeV; with transfer momentum: " << std::sqrt(TNuQSqr) << " GeV" << std::endl; 
-    std::cout << "Position (" << TNuX << ", " << TNuY << ", " << TNuZ << ") cm" << std::endl;
-    
-    // Save information of each daughter particle of the marley process
-    for ( int i = 0; i < N; i++) {
-      const simb::MCParticle &MarleyParticle = MARLEYtruth.GetParticle(i);
-      int MarleyParticlePDG = MarleyParticle.PdgCode(); MarleyPDGList.push_back(MarleyParticlePDG);
-      int MarleyParticleID  = MarleyParticle.TrackId(); MarleyIDList.push_back(MarleyParticleID);
-      int MarleyParentID    = MarleyParticle.Mother();  MarleyParentIDList.push_back(MarleyParentID);
-      float MarleyParticleE = MarleyParticle.E();       MarleyEList.push_back(MarleyParticleE);
-      float MarleyParticleP = MarleyParticle.P();       MarleyPList.push_back(MarleyParticleP);
-      float MarleyParticleX = MarleyParticle.EndX();    MarleyXList.push_back(MarleyParticleX);
-      float MarleyParticleY = MarleyParticle.EndY();    MarleyYList.push_back(MarleyParticleY);
-      float MarleyParticleZ = MarleyParticle.EndZ();    MarleyZList.push_back(MarleyParticleZ);
-    }
-  }
-
-  std::set< int > signal_trackids;                                              // Signal TrackIDs to be used in OpFlash matching
-  auto MarlTrue = evt.getValidHandle<std::vector<simb::MCTruth> >(fLabels[0]);  // Get handle for MARLEY MCTruths
-  art::FindManyP<simb::MCParticle> MarlAssn(MarlTrue,evt,fGEANTLabel);
-  std::vector<std::vector<int>> ClPartTrackIDs = {{},{},{},{}};                 // Track IDs corresponding to each kind of MCTruth particle  {11,22,2112,else}
-  std::cout << "\nGen.\t " << "PdgCode\t Energy\t\t TrackID" << std::endl;
-  std::cout << "------------------------------------------------" << std::endl;
-  
-  for ( size_t i = 0; i < MarlAssn.size(); i++) {
-    auto parts = MarlAssn.at(i);
-    for (auto part = parts.begin(); part != parts.end(); part++) {
-      signal_trackids.emplace((*part)->TrackId());
-
-      if ((*part)->PdgCode()<1000000){std::cout << fLabels[0] << "\t " << (*part)->PdgCode() << "\t\t " << (*part)->E() << "\t " << (*part)->TrackId() << std::endl;}
-      else{std::cout << fLabels[0] << "\t " << (*part)->PdgCode() << "\t " << (*part)->E() << "\t " << (*part)->TrackId() << std::endl;}
-
-      if ((*part)->PdgCode()==11){ // Electrons
-        const TLorentzVector &v4_f = (*part)->EndPosition();
-        auto x_f = v4_f.X();auto y_f = v4_f.Y();auto z_f = v4_f.Z();
-        avX = x_f; avY = y_f; avZ = z_f;
-        ClPartTrackIDs[0].push_back((*part)->TrackId());
-        if (fDebug) std::cout << "\nMC Electron truth position x = " << avX << ", y = " << avY << ", z = " << avZ << std::endl;
-        if (fDebug) std::cout << "Initial KE " << (*part)->E()-(*part)->Mass() << std::endl;
+  std::set< int > signal_trackids;                                // Signal TrackIDs to be used in OpFlash matching
+  std::vector<std::vector<int>> ClPartTrackIDs = {{},{},{},{}};   // Track IDs corresponding to each kind of MCTruth particle  {11,22,2112,else}
+  art::Handle<std::vector<simb::MCTruth>> ThisHandle;
+  std::string sNuTruth = "";
+  evt.getByLabel(fLabels[0], ThisHandle);
+  if (ThisHandle){
+    auto MarlTrue = evt.getValidHandle<std::vector<simb::MCTruth> >(fLabels[0]);  // Get handle for MARLEY MCTruths
+    // --- Loop over all neutrinos in the event ---
+    for (auto const &MARLEYtruth : *MarlTrue){ 
+      const simb::MCNeutrino &nue = MARLEYtruth.GetNeutrino();
+      TNuQSqr = nue.QSqr();
+      TNuE =    nue.Nu().E();
+      TNuP =    nue.Nu().Pt();
+      TNuX =    nue.Nu().Vx();
+      TNuY =    nue.Nu().Vy();
+      TNuZ =    nue.Nu().Vz();
+      int N =   MARLEYtruth.NParticles(); 
+      
+      sNuTruth = sNuTruth + "\nNumber of Neutrino Daughters: " + str(N-2);
+      sNuTruth = sNuTruth + "\nNeutrino energy: " + str(TNuE) + " GeV"; 
+      sNuTruth = sNuTruth + "\nMomentumTransfer: " + str(std::sqrt(TNuQSqr)) + " GeV";
+      sNuTruth = sNuTruth + "\nPosition (" + str(TNuX) + ", " + str(TNuY) + ", " + str(TNuZ) + ") cm";
+      
+      // Save information of each daughter particle of the marley process
+      for ( int i = 0; i < N; i++) {
+        const simb::MCParticle &MarleyParticle = MARLEYtruth.GetParticle(i);
+        int MarleyParticlePDG = MarleyParticle.PdgCode(); MarleyPDGList.push_back(MarleyParticlePDG);
+        int MarleyParticleID  = MarleyParticle.TrackId(); MarleyIDList.push_back(MarleyParticleID);
+        int MarleyParentID    = MarleyParticle.Mother();  MarleyParentIDList.push_back(MarleyParentID);
+        float MarleyParticleE = MarleyParticle.E();       MarleyEList.push_back(MarleyParticleE);
+        float MarleyParticleP = MarleyParticle.P();       MarleyPList.push_back(MarleyParticleP);
+        float MarleyParticleX = MarleyParticle.EndX();    MarleyXList.push_back(MarleyParticleX);
+        float MarleyParticleY = MarleyParticle.EndY();    MarleyYList.push_back(MarleyParticleY);
+        float MarleyParticleZ = MarleyParticle.EndZ();    MarleyZList.push_back(MarleyParticleZ);
       }
-      if ((*part)->PdgCode()==22){ClPartTrackIDs[1].push_back((*part)->TrackId());} // Gammas
-      if ((*part)->PdgCode()==2112){ClPartTrackIDs[2].push_back((*part)->TrackId());} // Neutrons
-      if ((*part)->PdgCode()!=11 && (*part)->PdgCode()!=22 && (*part)->PdgCode()!=2112){ClPartTrackIDs[3].push_back((*part)->TrackId());} // Others
-      // else {ClPartTrackIDs[3].push_back((*part)->TrackId()); std::cout << "TrackID " << (*part)->TrackId() << " going to rest" << std::endl;}
+    }
+    art::FindManyP<simb::MCParticle> MarlAssn(MarlTrue,evt,fGEANTLabel);
+    sNuTruth = sNuTruth + "\nGen.\t PdgCode\t Energy\t\t TrackID \n------------------------------------------------";
+    
+    for ( size_t i = 0; i < MarlAssn.size(); i++) {
+      auto parts = MarlAssn.at(i);
+      for (auto part = parts.begin(); part != parts.end(); part++) {
+        signal_trackids.emplace((*part)->TrackId());
+
+        if ((*part)->PdgCode()<1000000){sNuTruth = sNuTruth + "\n" + fLabels[0] + "\t " + str((*part)->PdgCode()) + "\t\t " + str((*part)->E()) + "\t " + str((*part)->TrackId());}
+        else{sNuTruth = sNuTruth + "\n" + fLabels[0] + "\t " + str((*part)->PdgCode()) + "\t " + str((*part)->E()) + "\t " + str((*part)->TrackId());}
+
+        if ((*part)->PdgCode()==11){ // Electrons
+          const TLorentzVector &v4_f = (*part)->EndPosition();
+          auto x_f = v4_f.X();auto y_f = v4_f.Y();auto z_f = v4_f.Z();
+          avX = x_f; avY = y_f; avZ = z_f;
+          ClPartTrackIDs[0].push_back((*part)->TrackId());
+          mf::LogDebug("SolarNuAna") << "\nMC Electron truth position x = " << avX << ", y = " << avY << ", z = " << avZ;
+          mf::LogDebug("SolarNuAna") << "Initial KE " << (*part)->E()-(*part)->Mass();
+        }
+        if ((*part)->PdgCode()==22){ClPartTrackIDs[1].push_back((*part)->TrackId());} // Gammas
+        if ((*part)->PdgCode()==2112){ClPartTrackIDs[2].push_back((*part)->TrackId());} // Neutrons
+        if ((*part)->PdgCode()!=11 && (*part)->PdgCode()!=22 && (*part)->PdgCode()!=2112){ClPartTrackIDs[3].push_back((*part)->TrackId());} // Others
+      }
     }
   }
+  else{mf::LogWarning("SolarNuAna") << "No MARLEY MCTruths found.";}
+  PrintInColor(sNuTruth,GetColor("blue"));
   fMCTruthTree->Fill();
   
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //------------------------------------------------------------------- Optical Flash Analysis --------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // Find OpHits and OpFlashes associated with the event
@@ -375,13 +408,14 @@ void SolarNuAna::analyze(art::Event const & evt)
   
   // Grab assns with OpHits to get match to neutrino purity
   art::FindManyP< recob::OpHit > OpAssns(flashlist, evt, fOpFlashLabel);
-  std::cout << "\nTotal number of flashes constructed: " << flashlist.size() << std::endl;
 
   // Loop over flashlist and assign OpHits to each flash
   for ( int i = 0; i < int(flashlist.size()); i++ ){
+
     recob::OpFlash TheFlash = *flashlist[i];
+    // if (i%10 == 0) PrintInColor("Flash Time = " + str(TheFlash.Time()), GetColor("red"));
     std::vector< art::Ptr< recob::OpHit > > matchedHits = OpAssns.at(i);
-    if (fDebug) std::cout << "Assigning OpHit to Flash" << std::endl;
+    mf::LogDebug("SolarNuAna") << "Assigning OpHit to Flash";
     // Calculate the total PE of the flash and the time of the ophit with the highest PE 
     double totPE = 0; double MaxHitPE = 0;
     float OpHitT, OpHitPE;
@@ -391,16 +425,19 @@ void SolarNuAna::analyze(art::Event const & evt)
       OpHitPE = ohit.PE();
       if (OpHitPE > MaxHitPE){
         MaxHitPE = OpHitPE;
-        OpHitT = ohit.PeakTimeAbs();
+        OpHitT = ohit.PeakTime();
       }
     }
 
-    if (fDebug) std::cout << "Evaluating Flash purity" << std::endl;
+    mf::LogDebug("SolarNuAna") << "Evaluating Flash purity";
+    // Calculate the flash purity
+    int TerminalOutput = supress_stdout();
     double OpFlashPur = pbt->OpHitCollectionPurity(signal_trackids, matchedHits);
-    if (fDebug) std::cout << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT << std::endl;
+    resume_stdout(TerminalOutput);
+    mf::LogDebug("SolarNuAna") << "PE of this OpFlash " << totPE << " OpFlash time " << OpHitT;
 
     // Calculate the flash purity, only for the Marley events
-    if (MaxHitPE/totPE < fAdjOpFlashMaxPECut){
+    if (MaxHitPE/totPE < fAdjOpFlashMaxPECut && totPE > fAdjOpFlashMinPECut){
       OpFlashMarlPur.push_back(OpFlashPur);
       OpFlashPE.push_back(TheFlash.TotalPE());
       OpFlashMaxPE.push_back(MaxHitPE);
@@ -410,10 +447,12 @@ void SolarNuAna::analyze(art::Event const & evt)
       OpFlashDeltaT.push_back(TheFlash.TimeWidth());
       OpFlashNHit.push_back(matchedHits.size());
     }
-    if (fDebug && abs(OpHitT) < 30) std::cout << "OpFlash PE (max/tot) " << MaxHitPE << "/" << TheFlash.TotalPE() << " with purity " << OpFlashPur << " time " << TheFlash.Time() << std::endl;
+    if (abs(OpHitT) < 30){
+      mf::LogDebug("SolarNuAna") << "OpFlash PE (max/tot) " << MaxHitPE << "/" << TheFlash.TotalPE() << " with purity " << OpFlashPur << " time " << TheFlash.Time();
+    }
   }
 
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //---------------------------------------------------------------- Hit collection and assignment ----------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Lift out the reco hits:
@@ -424,32 +463,35 @@ void SolarNuAna::analyze(art::Event const & evt)
     // --- Loop over the reconstructed hits to separate them among tpc planes according to view
     
     recob::Hit const& ThisHit = reco_hits->at(hit);
-    if (fDebug) std::cout << "Hit " << hit << " has view " << ThisHit.View() << " and signal type " << ThisHit.SignalType() << std::endl;
+    if (ThisHit.PeakTime() < 0) PrintInColor("Negative Hit Time = " + str(ThisHit.PeakTime()), GetColor("red"));
+    mf::LogDebug("SolarNuAna") << "Hit " << hit << " has view " << ThisHit.View() << " and signal type " << ThisHit.SignalType();
 
     if      (ThisHit.SignalType() == 0 && ThisHit.View() == 0){ColHits0.push_back( ThisHit );} // SignalType = 0
     else if (ThisHit.SignalType() == 0 && ThisHit.View() == 1){ColHits1.push_back( ThisHit );} // SignalType = 0
     else if (ThisHit.SignalType() == 1)                       {ColHits2.push_back( ThisHit );} // SignalType = 1
-    else    {ColHits3.push_back( ThisHit ); std::cout << "Hit was found with view out of scope" << std::endl;}
+    else    {ColHits3.push_back( ThisHit ); mf::LogError("SolarNuAna") << "Hit was found with view out of scope";}
   } 
 
-  std::cout << "# Hits in each view = " << ColHits0.size() << ", " << ColHits1.size() << ", " << ColHits2.size() << ", " << ColHits3.size() << std::endl;
-  
-  std::cout << std::endl;//----------------------------------------------------------------------------------------------------------------------------------------//
+  //----------------------------------------------------------------------------------------------------------------------------------------//
   //-------------------------------------------------------------- Cluster creation and analysis ------------------------------------------------------------------// 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------//
   // --- Now calculate the clusters ...
-  CalcAdjHits( ColHits0,Clusters0,hAdjHits,hAdjHitsADCInt,false);
-  CalcAdjHits( ColHits1,Clusters1,hAdjHits,hAdjHitsADCInt,false);
-  CalcAdjHits( ColHits2,Clusters2,hAdjHits,hAdjHitsADCInt,false);
-  CalcAdjHits( ColHits3,Clusters3,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits0,Clusters0,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits1,Clusters1,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits2,Clusters2,hAdjHits,hAdjHitsADCInt,false);
+  CalcAdjHits(ColHits3,Clusters3,hAdjHits,hAdjHitsADCInt,false);
 
-  std::cout << "# Clusters from the hits = " << Clusters0.size() << ", " << Clusters1.size() << ", " << Clusters2.size() << ", " << Clusters3.size() << std::endl;
-  
+  std::vector< std::vector< std::vector<float>>> ClGenPur = {{},{},{}};
   std::vector< std::vector< std::vector<recob::Hit>>> AllPlaneClusters = {Clusters0,Clusters1,Clusters2};
   std::vector< std::vector< float>> ClTotChrg = {{},{},{}}, ClMaxChrg = {{},{},{}}, CldT      = {{},{},{}}, ClT        = {{},{},{}}, ClX   = {{},{},{}}, ClY    = {{},{},{}}, ClZ = {{},{},{}};
   std::vector< std::vector< float>> ClFracE   = {{},{},{}}, ClFracGa  = {{},{},{}}, ClFracNe  = {{},{},{}}, ClFracRest = {{},{},{}}, ClPur = {{},{},{}}, Cldzdy = {{},{},{}};
   std::vector< std::vector< int  >> ClMainID  = {{},{},{}}, ClTPC     = {{},{},{}}, ClNHits   = {{},{},{}}, ClGen      = {{},{},{}};
 
+  std::string sRecoObjects = "";
+  sRecoObjects = sRecoObjects + "\nTotal number of flashes constructed: " + str(int(flashlist.size()));
+  sRecoObjects = sRecoObjects + "\n# Hits in each view = " + str(int(ColHits0.size())) + ", " + str(int(ColHits1.size())) + ", " + str(int(ColHits2.size())) + ", " + str(int(ColHits3.size()));
+  sRecoObjects = sRecoObjects + "\n# Clusters from the hits = " + str(int(Clusters0.size())) + ", " + str(int(Clusters1.size())) + ", " + str(int(Clusters2.size())) + ", " + str(int(Clusters3.size()));
+  PrintInColor(sRecoObjects,GetColor("cyan"));
   //------------------------------------------------------------ First complete cluster analysis ------------------------------------------------------------------// 
   // --- Now loop over the planes and the clusters to calculate the cluster properties
   for (int idx = 0; idx < 3; idx++){ 
@@ -460,75 +502,77 @@ void SolarNuAna::analyze(art::Event const & evt)
     // --- Loop over the clusters
     for (int i = 0; i < int(Clusters.size()); i++){ 
       int MainTrID = 0;
-      int gen = 1; float Pur = 0;
+      int Gen = 0; float Pur = 0;
       std::vector<float> thisdzdy = {};
 
       nhit = Clusters[i].size();
       ncharge = maxHit = clustT = FracE = FracGa = FracNe = FracRest = clustX = clustY = clustZ = clustTPC = dzdy = 0;
+      std::vector<float> GenPur = {}; for (size_t genpur = 0; genpur < fLabels.size(); genpur++){GenPur.push_back(0);}
       
-      if (fTestNewClReco == false){
-        for (recob::Hit hit : Clusters[i]){
-          ncharge += hit.Integral();
-          const geo::WireGeo* wire = geo->GeometryCore::WirePtr(hit.WireID()); // Wire directions should be the same for all hits of the same view (can be used to check)
-          // double dyds = wire->Direction()[1], dzds = wire->Direction()[2], hitCharge;
-          double hitCharge;
-            
-          geo::Point_t hXYZ = wire->GetCenter();
-          geo::Point_t sXYZ = wire->GetStart();
-          geo::Point_t eXYZ = wire->GetEnd();
-
-          geo::Vector_t direction = eXYZ - sXYZ;
-          auto dyds = direction.Y(), dzds = direction.Z();
-          // std::cout << "dxds " << direction.X() << " dyds " << direction.Y() << " dzds " << direction.Z() << std::endl;
-          thisdzdy.push_back(dzds/dyds);
+      for (recob::Hit hit : Clusters[i]){
+        if (hit.PeakTime() < 0) PrintInColor("Negative Cluster Time = " + str(hit.PeakTime()), GetColor("red"));
+        ncharge += hit.Integral();
+        const geo::WireGeo* wire = geo->GeometryCore::WirePtr(hit.WireID()); // Wire directions should be the same for all hits of the same view (can be used to check)
+        double hitCharge;
           
-          // Choose the position reco method to use for the cluster reco
-          if (sPositionReco == "DEFAULT") {if (fDebug) std::cout << "Using default position reco method" << std::endl;}
-          else {if (fDebug) std::cout << "ERROR: Position reco method not recognised. Defaulting to standard." << std::endl;}
+        geo::Point_t hXYZ = wire->GetCenter();
+        geo::Point_t sXYZ = wire->GetStart();
+        geo::Point_t eXYZ = wire->GetEnd();
 
-          int TPC = hit.WireID().TPC;
-          clustTPC += hit.Integral() * TPC; 
-          clustX += hit.Integral() * hXYZ.X(); clustY += hit.Integral() * hXYZ.Y();clustZ += hit.Integral() * hXYZ.Z();clustT += hit.Integral() * hit.PeakTime();
+        geo::Vector_t direction = eXYZ - sXYZ;
+        auto dyds = direction.Y(), dzds = direction.Z();
+        thisdzdy.push_back(dzds/dyds);
 
-          if (hit.Integral()>maxHit) {maxHit = hit.Integral();} // Look for maxHit inside cluster
-          
-          MainTrID = 0; double TopEFrac = -DBL_MAX;
-          std::vector< sim::TrackIDE > ThisHitIDE = bt_serv->HitToTrackIDEs(clockData, hit);
-          
-          for (size_t ideL=0; ideL < ThisHitIDE.size(); ++ideL){
-            if (ThisHitIDE[ideL].energyFrac > TopEFrac){
-              TopEFrac = ThisHitIDE[ideL].energyFrac;
-              MainTrID = ThisHitIDE[ideL].trackID; 
-              if (fDebug) std::cout << "This hit's IDE is: " << MainTrID << std::endl; 
-            }
+        int TPC = hit.WireID().TPC;
+        clustTPC += hit.Integral() * TPC; 
+        clustX += hit.Integral() * hXYZ.X(); clustY += hit.Integral() * hXYZ.Y();clustZ += hit.Integral() * hXYZ.Z();clustT += hit.Integral() * hit.PeakTime();
+
+        if (hit.Integral()>maxHit) {maxHit = hit.Integral();} // Look for maxHit inside cluster
+        
+        MainTrID = 0; double TopEFrac = -DBL_MAX;
+        std::vector< sim::TrackIDE > ThisHitIDE = bt_serv->HitToTrackIDEs(clockData, hit);
+        
+        for (size_t ideL=0; ideL < ThisHitIDE.size(); ++ideL){
+          if (ThisHitIDE[ideL].energyFrac > TopEFrac){
+            TopEFrac = ThisHitIDE[ideL].energyFrac;
+            MainTrID = ThisHitIDE[ideL].trackID; 
+            mf::LogDebug("SolarNuAna") << "This hit's IDE is: " << MainTrID; 
           }
-
-          for (int frac=0; frac < int(ClPartTrackIDs.size()); ++frac){
-            for (int trck=0; trck < int(ClPartTrackIDs[frac].size()); ++trck){
-              if (abs(MainTrID) == ClPartTrackIDs[frac][trck]){
-                if (frac == 0){FracE = FracE + hit.Integral();}
-                if (frac == 1){FracGa = FracGa + hit.Integral();}
-                if (frac == 2){FracNe = FracNe + hit.Integral();}
-                if (frac == 3){FracRest = FracRest + hit.Integral();}
-              }
-            }    
-          }
-
-          long unsigned int ThisPType = WhichParType(abs(MainTrID));
-          if (fDebug) std::cout << "\nThis particle type " << ThisPType;    
-          if (fDebug) std::cout << "\nThis cluster's main track ID " << MainTrID;    
-          if (ThisPType == 1){hitCharge = hit.Integral();Pur = Pur+hitCharge;}
-          else if (ThisPType != 1 && hit.Integral() == maxHit){gen = ThisPType;}
         }
+
+        for (int frac=0; frac < int(ClPartTrackIDs.size()); ++frac){
+          for (int trck=0; trck < int(ClPartTrackIDs[frac].size()); ++trck){
+            if (abs(MainTrID) == ClPartTrackIDs[frac][trck]){
+              if (frac == 0){FracE = FracE + hit.Integral();}
+              if (frac == 1){FracGa = FracGa + hit.Integral();}
+              if (frac == 2){FracNe = FracNe + hit.Integral();}
+              if (frac == 3){FracRest = FracRest + hit.Integral();}
+            }
+          }    
+        }
+        
+        long unsigned int ThisPType = WhichParType(abs(MainTrID));
+        GenPur[int(ThisPType)] = GenPur[int(ThisPType)] + hit.Integral();
+        mf::LogDebug("SolarNuAna") << "\nThis particle type " << ThisPType << "\nThis cluster's main track ID " << MainTrID;    
+        if (ThisPType == 1){hitCharge = hit.Integral();Pur = Pur+hitCharge;}
       }
 
-      for (size_t j = 0; j > thisdzdy.size(); j++) {if (thisdzdy[0] != thisdzdy[i]) std::cout << "MISSMATCH IN dzdy FOR CLUSTER " << idx << std::endl;}
+      float MaxGen = 0;
+      // PrintInColor("GenVector: "+ str(GenPur), GetColor("red"));
+      for (size_t genpur = 0; genpur < GenPur.size(); genpur++){
+        if (GenPur[genpur] > MaxGen){Gen = genpur; MaxGen = GenPur[genpur];}
+        GenPur[genpur] = GenPur[genpur]/ncharge;
+      }
+      // PrintInColor("Gen: "+ str(Gen), GetColor("red"));
+
+      for (size_t j = 0; j > thisdzdy.size(); j++) {if (thisdzdy[0] != thisdzdy[i]) mf::LogWarning("SolarNuAna") << "MISSMATCH IN dzdy FOR CLUSTER " << idx;}
 
       dzdy = thisdzdy[0]; thisdzdy.clear();      
       FracE /= ncharge; FracGa /= ncharge; FracNe /= ncharge; FracRest /= ncharge;
       clustTPC /= ncharge; clustX /= ncharge; clustY /= ncharge;clustZ /= ncharge;clustT /= ncharge;
-      if (fDebug) std::cout << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx << std::endl; 
-      
+      mf::LogDebug("SolarNuAna") << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx; 
+      if (clustT < 0) PrintInColor("Negative Cluster Time = " + str(clustT), GetColor("red"));
+
       ClTotChrg[idx].push_back(ncharge);
       ClMaxChrg[idx].push_back(maxHit);
       ClNHits[idx].push_back(nhit);
@@ -542,43 +586,41 @@ void SolarNuAna::analyze(art::Event const & evt)
       ClFracNe[idx].push_back(FracNe);
       ClFracRest[idx].push_back(FracRest);
       ClPur[idx].push_back(Pur/ncharge);
-      ClGen[idx].push_back(gen);
+      ClGen[idx].push_back(Gen);
       Cldzdy[idx].push_back(dzdy);
       ClMainID[idx].push_back(MainTrID);
+      ClGenPur[idx].push_back(GenPur);
 
-      if (fDebug) std::cout << "\nCluster " << i << " in plane " << idx << " has " << nhit << " hits, " << ncharge << " charge, " << clustT << " time, " << clustX << " X, " << clustY << " Y, " << clustZ << " Z, " << FracE << " FracE, " << FracGa << " FracGa, " << FracNe << " FracNe, " << FracRest << " FracRest, " << Pur/ncharge << " Pur, " << gen << " gen, " << dzdy << " dzdy, " << MainTrID << " MainTrID" << std::endl;
+      mf::LogDebug("SolarNuAna") << "\nCluster " << i << " in plane " << idx << " has #hits" << nhit << " charge, " << ncharge << " time, " << clustT;
+      mf::LogDebug("SolarNuAna") << " and position (" << clustY << ", " << clustZ << ") with main track ID " << MainTrID << " and purity " << Pur/ncharge;
     }
   } // Finished first cluster processing
-  std::cout << "\nLooking for matching clusters: " << std::endl;
   
-  std::cout << std::endl;//-------------------------------------------------------------------- Cluster Matching -------------------------------------------------------------------------// 
-  std::vector<int>   MVecNHit  = {}, MVecGen    = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
+  //-------------------------------------------------------------------- Cluster Matching -------------------------------------------------------------------------// 
+  std::vector<std::vector<float>> MVecGenFrac = {};
+  std::vector<int>   MVecNHit  = {}, MVecGen    = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecTPC = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
   std::vector<float> MVecTime  = {}, MVecChrg   = {}, MVecInd0MaxHit = {}, MVecInd1MaxHit = {}, MVecInd0dT = {}, MVecInd1dT = {};
   std::vector<float> MVecInd0RecoY = {}, MVecInd1RecoY = {}, MVecRecY = {}, MVecRecZ = {};
   std::vector<float> MVecFracE = {}, MVecFracGa = {}, MVecFracNe = {}, MVecFracRest = {}, MVecPur = {};
 
-  for (int ii = 0; ii < int(AllPlaneClusters[2].size()); ii++){    
+  for (int ii = 0; ii < int(AllPlaneClusters[2].size()); ii++){
     bool match = false;
     int ind0clustNHits = 0, ind1clustNHits = 0;
+    int ind0clustTPC = 0, ind1clustTPC = 0;
     double ind0clustY = -1e6, ind1clustY = -1e6, ind0clustMaxHit = 0, ind1clustMaxHit = 0;
     double ind0clustdT = fClusterMatchTime, ind1clustdT = fClusterMatchTime;
-    // std::cout << "Test" << std::endl;
     if (!AllPlaneClusters[2][ii].empty()){
-      if (fDebug) std::cout << "***Evaluating main cluster " << ii << " with charge " << ClTotChrg[2][ii] << "This cluster's purity is " << ClPur[2][ii]*100 << "%" << std::endl;
-      if (fDebug) std::cout << "This cluster's position is (" << ClY[2][ii] << ", " << ClZ[2][ii] << ") and its time is " << ClT[2][ii] << std::endl;
-
       if (!AllPlaneClusters[0].empty()){
         for (int jj = 0; jj < int(AllPlaneClusters[0].size()); jj++){
-          if (fDebug) std::cout << "Evaluating cluster " << jj << " from plane " << 0 << " with charge " << ClTotChrg[0][jj] << "This cluster's purity is " << ClPur[0][jj]*100 << "%" << std::endl;
-          if (fDebug) std::cout << "This cluster's position is (" << ClY[0][jj] << ", " << ClZ[0][jj] << ") and its time is " << ClT[0][jj] << std::endl;
           if (abs(ClT[2][ii] - ClT[0][jj]) < fClusterMatchTime && abs(fGoalInd0MatchTime - abs(ClT[2][ii] - ClT[0][jj])) < abs(fGoalInd0MatchTime - ind0clustdT)){
             ind0clustY = ClY[0][jj] + (ClZ[2][ii] - ClZ[0][jj])/(Cldzdy[0][jj]);
             ind0clustdT = abs(ClT[2][ii] - ClT[0][jj]);
             ind0clustNHits = int(AllPlaneClusters[0][jj].size());
             ind0clustMaxHit = ClMaxChrg[0][jj];
+            ind0clustTPC = ClTPC[0][jj];
             if (ind0clustY > -fMaxDetSizeY && ind0clustY < fMaxDetSizeY){match = true;}
-            if (fDebug) std::cout << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj] << std::endl;
-            if (fDebug) std::cout << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii] << std::endl;  
+            mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj];
+            mf::LogDebug("SolarNuAna") << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii];  
           }
         }
       }
@@ -589,83 +631,92 @@ void SolarNuAna::analyze(art::Event const & evt)
             ind1clustdT = abs(ClT[2][ii] - ClT[1][zz]);
             ind1clustNHits = int(AllPlaneClusters[1][zz].size());
             ind1clustMaxHit = ClMaxChrg[1][zz];
+            ind1clustTPC = ClTPC[1][zz];
             if (ind1clustY > -fMaxDetSizeY && ind1clustY < fMaxDetSizeY){match = true;}
-            if (fDebug) std::cout << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz] << std::endl;
-            if (fDebug) std::cout << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii] << std::endl;
+            mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz];
+            mf::LogDebug("SolarNuAna") << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii];
           }
         } // Loop over ind1 clusters
       }
     } // Loop over ind clusters
-    else {std::cout << "Cluster " << ii << " in plane 2 has no hits" << std::endl;}
+    else {mf::LogDebug("SolarNuAna") << "Cluster " << ii << " in plane 2 has no hits";}
     
     //--------------------------------------------------------- Export Matched cluster vectors ------------------------------------------------------------------// 
     if (match == true){
-      MVecTime.push_back(ClT[2][ii]);
+      // Cluster Charge
       MVecChrg.push_back(ClTotChrg[2][ii]);
+      // Cluster Hits
       MVecNHit.push_back(ClNHits[2][ii]);
-      MVecInd0TPC.push_back(ClTPC[0][ii]);
-      MVecInd1TPC.push_back(ClTPC[1][ii]);
-      MVecInd0dT.push_back(ind0clustdT);
-      MVecInd1dT.push_back(ind1clustdT);
-      MVecInd0RecoY.push_back(ind0clustY);
-      MVecInd1RecoY.push_back(ind1clustY);
-      MVecInd0MaxHit.push_back(ind0clustMaxHit);
-      MVecInd1MaxHit.push_back(ind1clustMaxHit);
       MVecInd0NHits.push_back(ind0clustNHits);
       MVecInd1NHits.push_back(ind1clustNHits);
+      // Cluster TPC
+      MVecTPC.push_back(ClTPC[2][ii]);
+      MVecInd0TPC.push_back(ind0clustTPC);
+      MVecInd1TPC.push_back(ind1clustTPC);
+      // Cluster Time
+      MVecTime.push_back(ClT[2][ii]);
+      MVecInd0dT.push_back(ind0clustdT);
+      MVecInd1dT.push_back(ind1clustdT);
+      // Cluster RecoY
+      MVecInd0RecoY.push_back(ind0clustY);
+      MVecInd1RecoY.push_back(ind1clustY);
+      // Cluster RecoZ	    
       MVecRecZ.push_back(ClZ[2][ii]);
+      // Cluster MaxChargeHit
+      MVecInd0MaxHit.push_back(ind0clustMaxHit);
+      MVecInd1MaxHit.push_back(ind1clustMaxHit);
+
+      // Cluster Marley Fractions
       MVecFracE.push_back(ClFracE[2][ii]);
       MVecFracGa.push_back(ClFracGa[2][ii]);
       MVecFracNe.push_back(ClFracNe[2][ii]);
       MVecFracRest.push_back(ClFracRest[2][ii]);
+      // Cluster Marley Purity
       MVecPur.push_back(ClPur[2][ii]);
-      MVecGen.push_back(ClGen[2][ii]);
+      // Cluster Gen and GenFraction
       MVecMainID.push_back(ClMainID[2][ii]);
+      MVecGen.push_back(ClGen[2][ii]);
+      MVecGenFrac.push_back(ClGenPur[2][ii]);
       
       float buffer = 1;
       if ((ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY) && (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY)){
-        std::cout << "BOTH IND RECO INSIDE OF DETECTOR" << std::endl;
+        mf::LogDebug("SolarNuAna") << "BOTH IND RECO INSIDE OF DETECTOR";
         MVecRecY.push_back((ind0clustY+ind1clustY)/2);}
       else if (ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY){
-        std::cout << "IND1 OUTSIDE OF DETECTOR" << std::endl;
+        mf::LogDebug("SolarNuAna") << "IND1 OUTSIDE OF DETECTOR";
         MVecRecY.push_back(ind0clustY);}
       else if (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY){
-        std::cout << "IND0 OUTSIDE OF DETECTOR" << std::endl;
+        mf::LogDebug("SolarNuAna") << "IND0 OUTSIDE OF DETECTOR";
         MVecRecY.push_back(ind1clustY);}
       else{
-        std::cout << "RECO OUTSIDE OF DETECTOR" << std::endl;
+        mf::LogDebug("SolarNuAna") << "RECO OUTSIDE OF DETECTOR";
         MVecRecY.push_back((ind0clustY+ind1clustY)/2); 
-        if (ClGen[2][ii] == 1){PrintInColor("Marley cluster recon structed outside of detector volume! RecoY = " + str((ind0clustY+ind1clustY)/2), GetColor("red"));}
+        if (ClGen[2][ii] == 1){mf::LogWarning("SolarNuAna") << "Marley cluster reconstructed outside of detector volume! RecoY = " << str((ind0clustY+ind1clustY)/2);}
       }
 
       // Print in color if the cluster is matched
-      if (fDebug){
-        std::string MatchedColor = "white";
-        if (ClNHits[2][ii] > fClusterMatchMinNHit && (ind0clustNHits > fClusterMatchMinNHit || ind1clustNHits > fClusterMatchMinNHit)){MatchedColor = "blue";}
-        else{MatchedColor = "white";}
-        PrintInColor("¡¡¡ Matched clusters !!! ", GetColor(MatchedColor));
-        PrintInColor(" - Cluster " + str(ClMainID[2][ii]) + " Gen " + str(ClGen[2][ii]) + " Purity " + str(ClPur[2][ii]) + " Hits " + str(ClNHits[2][ii]), GetColor(MatchedColor));
-        PrintInColor(" - Hits(ind0, ind1, col) " + str(ind0clustNHits) + ", " + str(ind1clustNHits) + ", " + str(ClNHits[2][ii]), GetColor(MatchedColor));
-        PrintInColor(" - Positions y(ind0, ind1) = " + str(ind0clustY) + ", " + str(ind1clustY) + ", z = " + str(ClZ[2][ii]) + "\n", GetColor(MatchedColor));
-      }    
+      mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster !!! ";
+      mf::LogDebug("SolarNuAna") << " - Cluster " << str(ClMainID[2][ii]) << " Gen " << str(ClGen[2][ii]) << " Purity " << str(ClPur[2][ii]) << " Hits " << str(ClNHits[2][ii]);
+      mf::LogDebug("SolarNuAna") << " - Hits(ind0, ind1, col) " << str(ind0clustNHits) << ", " << str(ind1clustNHits) << ", " << str(ClNHits[2][ii]);
+      mf::LogDebug("SolarNuAna") << " - Positions y(ind0, ind1) = " << str(ind0clustY) << ", " << str(ind1clustY) << ", z = " << str(ClZ[2][ii]) << "\n";
     } // if (match == true)
   } // Loop over collection plane clusters
   
-  std::cout << std::endl;//-------------------------------------------------------------------- Cluster Tree Export -------------------------------------------------------------------------// 
+  //-------------------------------------------------------------------- Cluster Tree Export -------------------------------------------------------------------------// 
   // Loop over matched clusters and export to tree if number of hits is above threshold
   for (int i = 0; i < int(MVecNHit.size()); i++){
     if(MVecNHit[i] > fClusterMatchMinNHit && (MVecInd0NHits[i] > fClusterMatchMinNHit || MVecInd1NHits[i] > fClusterMatchMinNHit)){
-      MAdjClTime = {};MAdjClCharge = {};MAdjClNHit = {};MAdjClRecoY = {};MAdjClRecoZ = {};MAdjClR = {};MAdjClPur = {};MAdjClGen = {};
+      MAdjClTime = {};MAdjClCharge = {};MAdjClNHit = {};MAdjClRecoY = {};MAdjClRecoZ = {};MAdjClR = {};MAdjClPur = {};MAdjClGen = {};MAdjClMainID = {};MAdjClMainPDG = {};
+      MAdjClMainE = {}; MAdjClMainX = {};MAdjClMainY = {};MAdjClMainZ = {};
       MAdjFlashTime = {};MAdjFlashPE = {};MAdjFlashNHit = {};MAdjFlashMaxPE = {};MAdjFlashRecoY = {};MAdjFlashRecoZ = {};MAdjFlashR = {};MAdjFlashPur = {};
       
       std::string ResultColor = "white";
-      PrintInColor("*** Matched preselection cluster: ",GetColor("blue"));
-      if (abs(MVecRecY[i] - TNuY) < 10 && abs(MVecRecZ[i] - TNuZ) < 10) {ResultColor = "green";PrintInColor(" - Cluster is close to neutrino vertex!",GetColor(ResultColor));}
-      else {ResultColor = "yellow";PrintInColor(" - Cluster is NOT close to neutrino vertex!",GetColor(ResultColor));}
+      if (abs(MVecRecY[i] - TNuY) < 10 && abs(MVecRecZ[i] - TNuZ) < 10) {ResultColor = "green";}
+      else {ResultColor = "yellow";}
 
-      PrintInColor(" - Cluster " + str(MVecMainID[i]) + " Gen " + str(MVecGen[i]) + " Purity " + str(MVecPur[i]) + " Hits " + str(MVecNHit[i]), GetColor(ResultColor));
-      PrintInColor(" - RecoY, Z (" + str(MVecRecY[i]) + ", " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
-      
+      PrintInColor("*** Matched preselection cluster: \n - MainCluster  " + str(MVecMainID[i]) + " Gen " + str(MVecGen[i]) + " Purity " + str(MVecPur[i]) + " Hits " + str(MVecNHit[i])
+        + "\n - RecoY/RecoZ (" + str(MVecRecY[i]) + " / " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
+
       // Loop over collection plane clusters to find adjacent clusters with distance < fAdjClusterRad and time < fAdjClusterTime
       for (int j = 0; j < int(MVecNHit.size()); j++){
         if(j != i && sqrt(pow(MVecRecY[i]-MVecRecY[j],2)+pow(MVecRecZ[i]-MVecRecZ[j],2)) < fAdjClusterRad && abs(MVecTime[i]-MVecTime[j]) < fAdjClusterTime){
@@ -677,12 +728,33 @@ void SolarNuAna::analyze(art::Event const & evt)
           MAdjClR.push_back(sqrt(pow(MVecRecY[i]-MVecRecY[j],2)+pow(MVecRecZ[i]-MVecRecZ[j],2)));
           MAdjClPur.push_back(MVecPur[j]);
           MAdjClGen.push_back(MVecGen[j]);
+          MAdjClMainID.push_back(MVecMainID[j]);
+
+          // If mother exists add the mother information
+          const simb::MCParticle *MAdjClTruth;
+          int TerminalOutput = supress_stdout();
+          MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
+          resume_stdout(TerminalOutput);
+          if (MAdjClTruth == 0) {
+            MAdjClMainPDG.push_back(0);          
+            MAdjClMainE.push_back(-1e6);
+            MAdjClMainX.push_back(-1e6);
+            MAdjClMainY.push_back(-1e6);
+            MAdjClMainZ.push_back(-1e6);
+          }
+          else{
+            MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
+            MAdjClMainE.push_back(MAdjClTruth->E());
+            MAdjClMainX.push_back(MAdjClTruth->Vx());
+            MAdjClMainY.push_back(MAdjClTruth->Vy());
+            MAdjClMainZ.push_back(MAdjClTruth->Vz());
+          }
         }
       }
 
       // Loop over optical flashes to find adjacent flashes with distance < fAdjOpFlashRad and time < fAdjOpFlashTime
       for (int j = 0; j < int(OpFlashPE.size()); j++){
-        if(sqrt(pow(MVecRecY[i]-OpFlashY[j],2)+pow(MVecRecZ[i]-OpFlashZ[j],2)) < fAdjOpFlashRad  && MVecTime[i]/2 - OpFlashT[j] < fAdjOpFlashTime && MVecTime[i]/2 - OpFlashT[j] > 0){
+        if(sqrt(pow(MVecRecY[i]-OpFlashY[j],2)+pow(MVecRecZ[i]-OpFlashZ[j],2)) < fAdjOpFlashRad  && MVecTime[i] - OpFlashT[j] < fAdjOpFlashTime && MVecTime[i] - OpFlashT[j] > 0){
           MAdjFlashTime.push_back(OpFlashT[j]);
           MAdjFlashPE.push_back(OpFlashPE[j]);
           MAdjFlashNHit.push_back(OpFlashNHit[j]);
@@ -695,35 +767,82 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
 
       // Fill the tree with the cluster information and the adjacent clusters and flashes
-      MPartFrac =      {MVecFracE[i],MVecFracGa[i],MVecFracNe[i],MVecFracRest[i]};
-      MTime =           MVecTime[i];   
-      MChrg =           MVecChrg[i];   
-      MNHit =           MVecNHit[i];
-      MInd0TPC =        MVecInd0TPC[i];
-      MInd1TPC =        MVecInd1TPC[i];
-      MInd0MaxHit =     MVecInd0MaxHit[i];   
-      MInd1MaxHit =     MVecInd1MaxHit[i];
-      MInd0NHits =      MVecInd0NHits[i];   
-      MInd1NHits =      MVecInd1NHits[i];
-      MInd0dT =         MVecInd0dT[i];   
-      MInd1dT =         MVecInd1dT[i];   
-      MInd0RecoY =      MVecInd0RecoY[i];   
-      MInd1RecoY =      MVecInd1RecoY[i];   
-      MRecZ =           MVecRecZ[i];   
-      MPur =            MVecPur[i];
-      MGen =            MVecGen[i];
-      // std::cout << "MGenLabel = " << fLabels[MVecGen[i]] << std::endl;
-      // MGenLabel =       fLabels[int(MGen)];
-      MMainID =         MVecMainID[i];
+      MMarleyFrac = {MVecFracE[i],MVecFracGa[i],MVecFracNe[i],MVecFracRest[i]};
+      MGenFrac =    MVecGenFrac[i];
+      MTime =       MVecTime[i];   
+      MChrg =       MVecChrg[i];   
+      MNHit =       MVecNHit[i];
+      // Cluster TPC
+      MTPC =        MVecTPC[i];
+      MInd0TPC =    MVecInd0TPC[i];
+      MInd1TPC =    MVecInd1TPC[i];
+      // Cluster MaxChargeHit
+      MInd0MaxHit = MVecInd0MaxHit[i];   
+      MInd1MaxHit = MVecInd1MaxHit[i];
+      MInd0NHits =  MVecInd0NHits[i];   
+      MInd1NHits =  MVecInd1NHits[i];
+      MInd0dT =     MVecInd0dT[i];   
+      MInd1dT =     MVecInd1dT[i];   
+      MInd0RecoY =  MVecInd0RecoY[i];   
+      MInd1RecoY =  MVecInd1RecoY[i];   
+      MMainID =     MVecMainID[i];
+      MRecZ =       MVecRecZ[i];   
+      MPur =        MVecPur[i];
+      MGen =        MVecGen[i];
+
+      // If mother exists add the mother information
+      const simb::MCParticle *MClTruth;
+      int TerminalOutput = supress_stdout();
+      MClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[i]);
+      resume_stdout(TerminalOutput);
+      if (MClTruth == 0){
+        MMainVertex = {-1e6,-1e6,-1e6};
+        MMainPDG =       0;
+        MMainE =      -1e6;
+        MMainT =      -1e6;
+        MMainP =      -1e6;
+        
+        MMainParentVertex = {-1e6,-1e6,-1e6};
+        MMainParentPDG =       0;
+        MMainParentE =      -1e6;
+        MMainParentT =      -1e6;
+        MMainParentP =      -1e6;
+      }
+      else{
+        MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
+        MMainPDG =    MClTruth->PdgCode();
+        MMainE =      MClTruth->E();
+        MMainT =      MClTruth->T();
+        MMainP =      MClTruth->P();
+        // If exists add the parent information
+        const simb::MCParticle *MClParentTruth;
+        int TerminalOutput = supress_stdout();
+        MClParentTruth = pi_serv->TrackIdToParticle_P(MClTruth->Mother());
+        resume_stdout(TerminalOutput);
+        if (MClParentTruth == 0){
+          MMainParentVertex = {-1e6,-1e6,-1e6};
+          MMainParentPDG =       0;
+          MMainParentE =      -1e6;
+          MMainParentT =      -1e6;
+          MMainParentP =      -1e6;
+        }
+        else{
+          MMainParentVertex = {MClParentTruth->Vx(),MClParentTruth->Vy(),MClParentTruth->Vz()};
+          MMainParentPDG =    MClParentTruth->PdgCode();
+          MMainParentE =      MClParentTruth->E();
+          MMainParentT =      MClParentTruth->T();
+          MMainParentP =      MClParentTruth->P();
+        }
+      }
 
       hDriftTime->      Fill(avX,MTime);
       fSolarNuAnaTree-> Fill();
       hXTruth->         Fill(MVecRecY[i]-TNuY,TNuX); 
       hYTruth->         Fill(MVecRecY[i]-TNuY,TNuY); 
-      hZTruth->         Fill(MVecRecY[i]-TNuY,TNuZ); 
+      hZTruth->         Fill(MVecRecZ[i]-TNuZ,TNuZ); 
+      if (MVecTime[i]<0) mf::LogWarning("SolarNuAna") << "Negative Main Cluster Time = " << MVecTime[i];
     }
   }
-  std::cout << std::endl;
 }
 
 //########################################################################################################################################//
@@ -899,7 +1018,7 @@ void SolarNuAna::FillMyMaps( std::map< int, simb::MCParticle> &MyMap, art::FindM
     for ( size_t L2=0; L2 < Assn.at(L1).size(); ++L2 ) {
       const simb::MCParticle ThisPar = (*Assn.at(L1).at(L2));
       MyMap[ThisPar.TrackId()] = ThisPar;
-      if (fDebug) std::cout << ThisPar.PdgCode() << " " << ThisPar.E() << std::endl;
+      mf::LogDebug("SolarNuAna") << ThisPar.PdgCode() << " " << ThisPar.E();
     }
   }
   return;
@@ -917,8 +1036,10 @@ bool SolarNuAna::InMyMap( int TrID, std::map< int, simb::MCParticle> ParMap ){
 
 //......................................................
 // This function creates a terminal color printout
-void SolarNuAna::PrintInColor( std::string MyString, int Color ){
-  std::cout << "\033[" << Color << "m" << MyString << "\033[0m" << std::endl;
+void SolarNuAna::PrintInColor( std::string MyString, int Color, std::string Type ){
+  if (Type == "Info"){mf::LogInfo("SolarNuAna") << "\033[" << Color << "m" << MyString << "\033[0m";}
+  if (Type == "Degub"){mf::LogDebug("SolarNuAna") << "\033[" << Color << "m" << MyString << "\033[0m";}
+  if (Type == "Error"){mf::LogError("SolarNuAna") << "\033[" << Color << "m" << MyString << "\033[0m";}
   return;
 }
 
@@ -933,12 +1054,41 @@ int SolarNuAna::GetColor( std::string ColorName ){
   else if (ColorName == "magenta") return 35;
   else if (ColorName == "cyan") return 36;
   else if (ColorName == "white") return 37;
-  else {std::cout << "Color " << ColorName << " not recognized. Returning white." << std::endl; return 37;}
+  else if (ColorName == "bright_black") return 90;
+  else if (ColorName == "bright_red") return 91;
+  else if (ColorName == "bright_green") return 92;
+  else if (ColorName == "bright_yellow") return 93;
+  else if (ColorName == "bright_blue") return 94;
+  else if (ColorName == "bright_magenta") return 95;
+  else if (ColorName == "bright_cyan") return 96;
+  else if (ColorName == "bright_white") return 97;
+  else {mf::LogError("SolarNuAna") << "Color " << ColorName << " not recognized. Returning white."; return 37;}
   return 0;
 }
 
 std::string SolarNuAna::str( int i ) {std::stringstream ss;ss << i;return ss.str();}
 std::string SolarNuAna::str( double i ) {std::stringstream ss;ss << i;return ss.str();}
 std::string SolarNuAna::str( float i ) {std::stringstream ss;ss << i;return ss.str();}
+std::string SolarNuAna::str( std::vector<int> i ) {std::stringstream ss;for (int j = 0; j < int(i.size()); j++){ss << i[j] << " ";}return ss.str();}
+std::string SolarNuAna::str( std::vector<double> i ) {std::stringstream ss;for (int j = 0; j < int(i.size()); j++){ss << i[j] << " ";}return ss.str();}
+std::string SolarNuAna::str( std::vector<float> i ) {std::stringstream ss;for (int j = 0; j < int(i.size()); j++){ss << i[j] << " ";}return ss.str();}
+
+int SolarNuAna::supress_stdout() {
+  std::fflush(stdout);
+
+  int ret = dup(1);
+  int nullfd = open("/dev/null", O_WRONLY);
+  // check nullfd for error omitted
+  dup2(nullfd, 1);
+  close(nullfd);
+
+  return ret;
+}
+
+void SolarNuAna::resume_stdout(int fd) {
+  std::fflush(stdout);
+  dup2(fd, 1);
+  close(fd);
+}
 
 DEFINE_ART_MODULE(SolarNuAna)
