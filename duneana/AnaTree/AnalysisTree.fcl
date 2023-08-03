@@ -34,6 +34,8 @@ dune35t_analysistree:
  ContainmentTaggerAssocLabel: [ "", "", "", "" ] # Not used in 35 ton
  FlashMatchAssocLabel:        [ "", "", "", "" ] # Not used in 35 ton
  POTModuleLabel:              ""
+ PFParticleModuleLabel:       "pandora" # pandoraTrack and pandoraShower should be passed as the first labels for tracks and showers
+
 
  UseBuffers:               false
  IgnoreMissingShowers:     false
@@ -56,6 +58,7 @@ dune35t_analysistree:
  SaveCaloCosmics:          true
  SaveSpacePointSolverInfo: false
  SaveCnnInfo:              false
+ SavePFParticleInfo:       true
  G4minE:                   -1
 }
 
