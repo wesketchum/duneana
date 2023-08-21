@@ -11,7 +11,8 @@ dune35t_analysistree:
  CryGenModuleLabel:           "generator"
  ProtoGenModuleLabel:         ""
  G4ModuleLabel:               "largeant"
- TrackModuleLabel:            [ "pmtrack", "pmtrackdc", "pandoraTrack", "pandoraTrackdc" ]
+ SimChannelLabel:             "tpcrawdecoder:simpleSC" # For previous versions use `largeant`
+ TrackModuleLabel:            ["pandoraTrack", "pmtrack", "pmtrackdc", "pandoraTrackdc" ]
  VertexModuleLabel:           [ "linecluster", "lineclusterdc", "pmtrack", "pmtrackdc", "pandora", "pandoradc" ]
  PandoraNuVertexModuleLabel:  ""
  ClusterModuleLabel:          "linecluster"
@@ -33,6 +34,8 @@ dune35t_analysistree:
  ContainmentTaggerAssocLabel: [ "", "", "", "" ] # Not used in 35 ton
  FlashMatchAssocLabel:        [ "", "", "", "" ] # Not used in 35 ton
  POTModuleLabel:              ""
+ PFParticleModuleLabel:       "pandora" # pandoraTrack and pandoraShower should be passed as the first labels for tracks and showers
+
 
  UseBuffers:               false
  IgnoreMissingShowers:     false
@@ -55,6 +58,7 @@ dune35t_analysistree:
  SaveCaloCosmics:          true
  SaveSpacePointSolverInfo: false
  SaveCnnInfo:              false
+ SavePFParticleInfo:       true
  G4minE:                   -1
 }
 
@@ -62,7 +66,7 @@ protodune_analysistree:   @local::dune35t_analysistree
 protodune_analysistree.CryGenModuleLabel: "cosmicgenerator"
 protodune_analysistree.ProtoGenModuleLabel: "generator"
 protodune_analysistree.SaveProtoInfo: true
-protodune_analysistree.TrackModuleLabel: [ "pmtrack", "pandoraTrack" ]
+protodune_analysistree.TrackModuleLabel: ["pandoraTrack", "pmtrack" ]
 protodune_analysistree.CalorimetryModuleLabel: [ "pmtrackcalo", "pandoracalo" ]
 protodune_analysistree.ParticleIDModuleLabel:       [ "pmtrackpid", "pandorapid" ]
 protodune_analysistree.FlashT0FinderLabel: [ "", "" ]
@@ -81,7 +85,7 @@ protodune_analysistree_data.SaveProtoInfo: false
 dune10kt_analysistree: @local::dune35t_analysistree
 dune10kt_analysistree.PandoraNuVertexModuleLabel: "pandora"
 dune10kt_analysistree.LArGeantModuleLabel: "tpcrawdecoder:simpleSC"
-dune10kt_analysistree.TrackModuleLabel: [ "pmtrack", "pmtracktc", "pandoraTrack", "pmtrajfit" ]
+dune10kt_analysistree.TrackModuleLabel: ["pandoraTrack", "pmtrack", "pmtracktc", "pmtrajfit" ]
 dune10kt_analysistree.CalorimetryModuleLabel: [ "pmtrackcalo", "pmtracktccalo", "pandoracalo", "pmtrajfitcalo" ]
 dune10kt_analysistree.ParticleIDModuleLabel:       [ "pmtrackpid", "pmtracktcpid", "pandorapid", "pmtrajfitpid" ]
 SpacePointSolverModuleLabel: "spsolve"

@@ -83,6 +83,8 @@
 
 #include "lardata/ArtDataHelper/MVAReader.h"
 
+#include "nusimdata/SimulationBase/GTruth.h"
+
 #include <cstddef> // std::ptrdiff_t
 #include <cstring> // std::memcpy()
 #include <vector>
@@ -260,7 +262,8 @@ namespace dune {
       TrackData_t<Float_t> trkmommsllhd;   // track momentum from multiple scattering LLHD method
       TrackData_t<Short_t> trksvtxid;     // Vertex ID associated with the track start
       TrackData_t<Short_t> trkevtxid;     // Vertex ID associated with the track end
-      PlaneData_t<Int_t> trkpidpdg;       // particle PID pdg code
+      PlaneData_t<Int_t> trkpidpdg;       // [deprecated] particle PID pdg code
+      PlaneData_t<Int_t> trkpidndf;       // Particle PID ndf based on valid hits
       PlaneData_t<Float_t> trkpidchi;
       PlaneData_t<Float_t> trkpidchipr;   // particle PID chisq for proton
       PlaneData_t<Float_t> trkpidchika;   // particle PID chisq for kaon
@@ -642,6 +645,7 @@ namespace dune {
     Int_t     nuPDG_truth[kMaxTruth];     //neutrino PDG code
     Int_t     ccnc_truth[kMaxTruth];      //0=CC 1=NC
     Int_t     mode_truth[kMaxTruth];      //0=QE/El, 1=RES, 2=DIS, 3=Coherent production
+    Float_t   nuWeight_truth[kMaxTruth];     //neutrino weight from generator
     Float_t  enu_truth[kMaxTruth];       //true neutrino energy
     Float_t  Q2_truth[kMaxTruth];        //Momentum transfer squared
     Float_t  W_truth[kMaxTruth];         //hadronic invariant mass
@@ -1248,6 +1252,7 @@ namespace dune {
     std::string fDigitModuleLabel;
     std::string fHitsModuleLabel;
     std::string fLArG4ModuleLabel;
+    std::string fSimChannelLabel;
     std::string fCalDataModuleLabel;
     std::string fGenieGenModuleLabel;
     std::string fCryGenModuleLabel;
@@ -1520,6 +1525,7 @@ void dune::AnalysisTreeDataStruct::TrackDataStruct::Resize(size_t nTracks)
   trkevtxid.resize(MaxTracks);
   // PID variables
   trkpidpdg.resize(MaxTracks);
+  trkpidndf.resize(MaxTracks);
   trkpidchi.resize(MaxTracks);
   trkpidchipr.resize(MaxTracks);
   trkpidchika.resize(MaxTracks);
@@ -1634,6 +1640,7 @@ void dune::AnalysisTreeDataStruct::TrackDataStruct::Clear() {
     FillWith(trkxyz[iTrk], 0.);
 
     FillWith(trkpidpdg[iTrk]    , -1);
+    FillWith(trkpidndf[iTrk]    , -9999);
     FillWith(trkpidchi[iTrk]    , -99999.);
     FillWith(trkpidchipr[iTrk]  , -99999.);
     FillWith(trkpidchika[iTrk]  , -99999.);
@@ -1847,6 +1854,9 @@ void dune::AnalysisTreeDataStruct::TrackDataStruct::SetAddresses(
 
   BranchName = "trkpidpdg_" + TrackLabel;
   CreateBranch(BranchName, trkpidpdg, BranchName + NTracksIndexStr + "[3]/I");
+
+  BranchName = "trkpidndf_" + TrackLabel;
+  CreateBranch(BranchName, trkpidndf, BranchName + NTracksIndexStr + "[3]/I");
 
   BranchName = "trkpidchi_" + TrackLabel;
   CreateBranch(BranchName, trkpidchi, BranchName + NTracksIndexStr + "[3]/F");
@@ -2349,6 +2359,7 @@ void dune::AnalysisTreeDataStruct::ClearLocalData() {
   std::fill(nuPDG_truth, nuPDG_truth + sizeof(nuPDG_truth)/sizeof(nuPDG_truth[0]), -99999.);
   std::fill(ccnc_truth, ccnc_truth + sizeof(ccnc_truth)/sizeof(ccnc_truth[0]), -99999.);
   std::fill(mode_truth, mode_truth + sizeof(mode_truth)/sizeof(mode_truth[0]), -99999.);
+  std::fill(nuWeight_truth, nuWeight_truth + sizeof(nuWeight_truth)/sizeof(nuWeight_truth[0]), 1.);
   std::fill(enu_truth, enu_truth + sizeof(enu_truth)/sizeof(enu_truth[0]), -99999.);
   std::fill(Q2_truth, Q2_truth + sizeof(Q2_truth)/sizeof(Q2_truth[0]), -99999.);
   std::fill(W_truth, W_truth + sizeof(W_truth)/sizeof(W_truth[0]), -99999.);
@@ -3008,6 +3019,7 @@ void dune::AnalysisTreeDataStruct::SetAddresses(
     CreateBranch("nuPDG_truth",nuPDG_truth,"nuPDG_truth[mcevts_truth]/I");
     CreateBranch("ccnc_truth",ccnc_truth,"ccnc_truth[mcevts_truth]/I");
     CreateBranch("mode_truth",mode_truth,"mode_truth[mcevts_truth]/I");
+    CreateBranch("nuWeight_truth",nuWeight_truth,"nuWeight_truth[mcevts_truth]/F");
     CreateBranch("enu_truth",enu_truth,"enu_truth[mcevts_truth]/F");
     CreateBranch("Q2_truth",Q2_truth,"Q2_truth[mcevts_truth]/F");
     CreateBranch("W_truth",W_truth,"W_truth[mcevts_truth]/F");
@@ -3330,6 +3342,7 @@ dune::AnalysisTree::AnalysisTree(fhicl::ParameterSet const& pset) :
   fDigitModuleLabel         (pset.get< std::string >("DigitModuleLabel")        ),
   fHitsModuleLabel          (pset.get< std::string >("HitsModuleLabel")         ),
   fLArG4ModuleLabel         (pset.get< std::string >("LArGeantModuleLabel")     ),
+  fSimChannelLabel          (pset.get< std::string >("SimChannelLabel")     ),
   fCalDataModuleLabel       (pset.get< std::string >("CalDataModuleLabel")      ),
   fGenieGenModuleLabel      (pset.get< std::string >("GenieGenModuleLabel")     ),
   fCryGenModuleLabel        (pset.get< std::string >("CryGenModuleLabel")       ),
@@ -3828,7 +3841,7 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
   std::vector<const sim::SimChannel*> fSimChannels;
   if (isMC && fSaveGeantInfo)
-    evt.getView(fLArG4ModuleLabel, fSimChannels);
+    evt.getView(fSimChannelLabel, fSimChannels);
 
   fData->run = evt.run();
   fData->subrun = evt.subRun();
@@ -4233,12 +4246,12 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
     // Get a PFParticle-to-track map.
     lar_pandora::TrackVector allPfParticleTracks;
     lar_pandora::PFParticlesToTracks pfParticleToTrackMap;
-    lar_pandora::LArPandoraHelper::CollectTracks(evt, fPFParticleModuleLabel, allPfParticleTracks, pfParticleToTrackMap);
+    lar_pandora::LArPandoraHelper::CollectTracks(evt, fTrackModuleLabel[0], allPfParticleTracks, pfParticleToTrackMap);
 
     // Get a PFParticle-to-shower map.
     lar_pandora::ShowerVector allPfParticleShowers;
     lar_pandora::PFParticlesToShowers pfParticleToShowerMap;
-    lar_pandora::LArPandoraHelper::CollectShowers(evt, fPFParticleModuleLabel, allPfParticleShowers, pfParticleToShowerMap);
+    lar_pandora::LArPandoraHelper::CollectShowers(evt, fShowerModuleLabel[0], allPfParticleShowers, pfParticleToShowerMap);
 
     for (size_t i = 0; i < NPFParticles && i < PFParticleData.GetMaxPFParticles() ; ++i){
       PFParticleData.pfp_selfID[i] = pfparticlelist[i]->Self();
@@ -4251,7 +4264,9 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
       // Set the daughter IDs.
       std::vector<size_t> daughterIDs = pfparticlelist[i]->Daughters();
 
-      for (size_t j = 0; j < daughterIDs.size(); ++j)
+      if (daughterIDs.size() > kMaxNDaughtersPerPFP)
+        std::cerr << "Warning: there were " << daughterIDs.size() << " reconstructed PFParticle daughters; only the first " << kMaxNDaughtersPerPFP << " being stored in tree" << std::endl;
+      for (size_t j = 0; j < std::min(daughterIDs.size(), (size_t)kMaxNDaughtersPerPFP); ++j)
         PFParticleData.pfp_daughterIDs[i][j] = daughterIDs[j];
 
       // Set the vertex ID.
@@ -4319,7 +4334,9 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
           lar_pandora::ClusterVector pfParticleClusters = clusterMapIter->second;
           PFParticleData.pfp_numClusters[i] = pfParticleClusters.size();
 
-          for (size_t j = 0; j < pfParticleClusters.size(); ++j)
+          if (pfParticleClusters.size() > kMaxNClustersPerPFP)
+            std::cerr << "Warning: there were " << pfParticleClusters.size() << " reconstructed PFParticle clusters; only the first " << kMaxNClustersPerPFP << " being stored in tree" << std::endl;
+          for (size_t j = 0; j < std::min(pfParticleClusters.size(), (size_t)kMaxNClustersPerPFP); ++j)
             PFParticleData.pfp_clusterIDs[i][j] = pfParticleClusters[j]->ID();
       }
       //else
@@ -4559,33 +4576,43 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
            }*/
 
         // find particle ID info
-        /*
-        // Note from Jake Calcutt: There has been a breaking change in the definition
-        // of the anab::ParticleID class. If you are using this class and want this info
-        // in this tree, these must be updated
+        // This was updated to gather the Chi2 information for each particle with the new definitions of anab::ParticleID class. It was previously commented by Jake Calcutt
         art::FindMany<anab::ParticleID> fmpid(trackListHandle[iTracker], evt, fParticleIDModuleLabel[iTracker]);
         if(fmpid.isValid()) {
           std::vector<const anab::ParticleID*> pids = fmpid.at(iTrk);
-          //if(pids.size() > 1) {
-          //mf::LogError("AnalysisTree:limits")
-          //<< "the " << fTrackModuleLabel[iTracker] << " track #" << iTrk
-          //<< " has " << pids.size()
-          //<< " set of ParticleID variables. Only one stored in the tree";
-          //}
+          
           for (size_t ipid = 0; ipid < pids.size(); ++ipid){
             if (!pids[ipid]->PlaneID().isValid) continue;
             int planenum = pids[ipid]->PlaneID().Plane;
             if (planenum<0||planenum>2) continue;
-            TrackerData.trkpidpdg[iTrk][planenum] = pids[ipid]->Pdg();
-            TrackerData.trkpidchi[iTrk][planenum] = pids[ipid]->MinChi2();
-            TrackerData.trkpidchipr[iTrk][planenum] = pids[ipid]->Chi2Proton();
-            TrackerData.trkpidchika[iTrk][planenum] = pids[ipid]->Chi2Kaon();
-            TrackerData.trkpidchipi[iTrk][planenum] = pids[ipid]->Chi2Pion();
-            TrackerData.trkpidchimu[iTrk][planenum] = pids[ipid]->Chi2Muon();
-            TrackerData.trkpidpida[iTrk][planenum] = pids[ipid]->PIDA();
+
+            auto pidScore = pids[ipid]->ParticleIDAlgScores();
+            for(auto pScore: pidScore){
+              double chi2value = pScore.fValue;
+
+              // PIDA is always the last one and ndf there is -9999
+              if(pScore.fAssumedPdg != 0) TrackerData.trkpidndf[iTrk][planenum] = pScore.fNdf; // This value is the same for each particle type, but different in each plane
+              switch(pScore.fAssumedPdg){
+                case 2212:
+                  TrackerData.trkpidchipr[iTrk][planenum] = chi2value;
+                  break;
+                case 321:
+                  TrackerData.trkpidchika[iTrk][planenum] = chi2value;
+                  break;
+                case 211:
+                  TrackerData.trkpidchipi[iTrk][planenum] = chi2value;
+                  break;
+                case 13:
+                  TrackerData.trkpidchimu[iTrk][planenum] = chi2value;
+                  break;
+                case 0:
+                  TrackerData.trkpidpida[iTrk][planenum] = chi2value;
+                  break;
+              }
+            }
           }
         } // fmpid.isValid()
-        */
+
         if(fMVAPIDTrackModuleLabel[iTracker].size()){
           art::FindOneP<anab::MVAPIDResult> fmvapid(trackListHandle[iTracker], evt, fMVAPIDTrackModuleLabel[iTracker]);
           if(fmvapid.isValid()) {
@@ -4859,6 +4886,11 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
               fData->lep_dcosz_truth[neutrino_i] = mclist[iList]->GetNeutrino().Lepton().Pz()/mclist[iList]->GetNeutrino().Lepton().P();
             }
 
+            auto gt = evt.getHandle< std::vector<simb::GTruth> >("generator");
+            if ( gt ){
+              auto gtruth = (*gt)[0];
+              fData->nuWeight_truth[neutrino_i] = gtruth.fweight;;
+            }
             //flux information
             //
             // Double-check that a simb::MCFlux object is associated with the
