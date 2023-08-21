@@ -11,7 +11,7 @@ dune35t_analysistree:
  CryGenModuleLabel:           "generator"
  ProtoGenModuleLabel:         ""
  G4ModuleLabel:               "largeant"
- SimChannelLabel:             "tpcrawdecoder::simpleSC" # For previous versions use `largeant`
+ SimChannelLabel:             "tpcrawdecoder:simpleSC" # For previous versions use `largeant`
  TrackModuleLabel:            ["pandoraTrack", "pmtrack", "pmtrackdc", "pandoraTrackdc" ]
  VertexModuleLabel:           [ "linecluster", "lineclusterdc", "pmtrack", "pmtrackdc", "pandora", "pandoradc" ]
  PandoraNuVertexModuleLabel:  ""
