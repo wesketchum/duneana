@@ -82,22 +82,22 @@ private:
   std::string fRawDigitLabel,fHitLabel,fOpHitLabel,fOpDetWaveformLabel,fOpFlashLabel,fGEANTLabel; 
 
   // --- Input settings imported from the fcl
+  std::string fGeometry;
+  int fDetectorSizeX, fDetectorSizeY, fClusterInd0MatchTime, fClusterInd1MatchTime,fClusterPreselectionNHit;
+  float fClusterMatchTime,fAdjClusterTime,fAdjClusterRad,fClusterMatchCharge,fAdjOpFlashRad,fAdjOpFlashTime,fAdjOpFlashMaxPECut,fAdjOpFlashMinPECut,fClusterMatchNHit;
   std::vector<std::string> fLabels;
-  int fMaxDetSizeY, fClusterMatchMinNHit, fGoalInd0MatchTime, fGoalInd1MatchTime;
-  float fClusterMatchTime,fAdjClusterTime,fAdjClusterRad,fAdjOpFlashRad,fAdjOpFlashTime,fAdjOpFlashMaxPECut,fAdjOpFlashMinPECut;
   
   // --- Our TTrees, and its associated variables.
   TTree* fSolarNuAnaTree;
   TTree* fMCTruthTree;
   std::string MGenLabel;
-  // trj removed Run and SubRun as they are unused and clang complained
   int Event,Flag,MNHit,MGen,MTPC,MInd0TPC,MInd1TPC,MInd0NHits,MInd1NHits,MMainID,MMainT,MMainPDG,MMainParentPDG;
-  float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MChrg,MInd0MaxHit,MInd1MaxHit,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP,MMainParentE,MMainParentP,MMainParentT;
+  float TNuQSqr,TNuE,TNuP,TNuX,TNuY,TNuZ,avX,avY,avZ,MTime,MCharge,MMaxCharge,MInd0Charge,MInd1Charge,MInd0MaxCharge,MInd1MaxCharge,MInd0dT,MInd1dT,MInd0RecoY,MInd1RecoY,MRecZ,MPur,MMainE,MMainP,MMainParentE,MMainParentP,MMainParentT;
   std::vector<int> MAdjClGen,MAdjClMainID,TPart,MarleyPDGList,MarleyIDList,MarleyParentIDList,MAdjClMainPDG;
-  std::vector<float> MAdjClTime,MAdjClCharge,MAdjClNHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainE,MAdjClMainX,MAdjClMainY,MAdjClMainZ,MMarleyFrac,MGenFrac;
+  std::vector<float> MAdjClTime,MAdjClCharge,MAdjClInd0Charge,MAdjClInd1Charge,MAdjClMaxCharge,MAdjClInd0MaxCharge,MAdjClInd1MaxCharge,MAdjClNHit,MAdjClInd0NHit,MAdjClInd1NHit,MAdjClRecoY,MAdjClRecoZ,MAdjClR,MAdjClPur,MAdjClMainE,MAdjClMainX,MAdjClMainY,MAdjClMainZ,MMarleyFrac,MGenFrac;
   std::vector<float> MAdjFlashTime,MAdjFlashPE,MAdjFlashNHit,MAdjFlashMaxPE,MAdjFlashRecoY,MAdjFlashRecoZ,MAdjFlashR,MAdjFlashPur;
   std::vector<float> MarleyEList,MarleyPList,MarleyXList,MarleyYList,MarleyZList;
-  std::vector<double> MMainVertex,MMainParentVertex;
+  std::vector<double> MMainVertex,MEndVertex,MMainParentVertex;
   std::vector<std::map<int,simb::MCParticle>> Parts = {};
   
   // --- OpFlash Variables
@@ -132,17 +132,24 @@ void SolarNuAna::reconfigure(fhicl::ParameterSet const & p){
   fOpHitLabel         = p.get<std::string>  ("OpHitLabel");
   fGEANTLabel         = p.get<std::string>  ("GEANT4Label");
 
-  fMaxDetSizeY         = p.get<int>         ("DetectorSizeY");
-  fClusterMatchMinNHit = p.get<int>         ("ClusterMatchMinNHit");
-  fClusterMatchTime    = p.get<float>       ("ClusterMatchTime");
-  fGoalInd0MatchTime   = p.get<float>       ("GoalInd0MatchTime");
-  fGoalInd1MatchTime   = p.get<float>       ("GoalInd1MatchTime");
-  fAdjClusterTime      = p.get<float>       ("AdjClusterTime");
-  fAdjClusterRad       = p.get<float>       ("AdjClusterRad");
-  fAdjOpFlashTime      = p.get<float>       ("AdjOpFlashTime");
-  fAdjOpFlashRad       = p.get<float>       ("AdjOpFlashRad");
-  fAdjOpFlashMaxPECut  = p.get<float>       ("AdjOpFlashMaxPECut");
-  fAdjOpFlashMinPECut  = p.get<float>       ("AdjOpFlashMinPECut");
+  fGeometry                = p.get<std::string> ("Geometry");
+  fDetectorSizeX           = p.get<int>         ("DetectorSizeX");
+  fDetectorSizeY           = p.get<int>         ("DetectorSizeY");
+  fClusterMatchNHit        = p.get<float>       ("ClusterMatchNHit");
+  fClusterMatchCharge      = p.get<float>       ("ClusterMatchCharge");
+  fClusterMatchTime        = p.get<float>       ("ClusterMatchTime");
+  fClusterInd0MatchTime    = p.get<float>       ("ClusterInd0MatchTime");
+  fClusterInd1MatchTime    = p.get<float>       ("ClusterInd1MatchTime");
+  
+  fClusterPreselectionNHit = p.get<int>         ("ClusterPreselectionNHit");
+  
+  fAdjClusterTime          = p.get<float>       ("AdjClusterTime");
+  fAdjClusterRad           = p.get<float>       ("AdjClusterRad");
+  
+  fAdjOpFlashTime          = p.get<float>       ("AdjOpFlashTime");
+  fAdjOpFlashRad           = p.get<float>       ("AdjOpFlashRad");
+  fAdjOpFlashMaxPECut      = p.get<float>       ("AdjOpFlashMaxPECut");
+  fAdjOpFlashMinPECut      = p.get<float>       ("AdjOpFlashMinPECut");
 } // Reconfigure
 
 //......................................................
@@ -197,21 +204,24 @@ void SolarNuAna::beginJob(){
   // Main Cluster info.
   fSolarNuAnaTree -> Branch("Generator",        &MGen,             "Generator/I");     // Main cluster generator idx  
   fSolarNuAnaTree -> Branch("Purity",           &MPur,             "Purity/F");        // Main cluster reco purity
-  fSolarNuAnaTree -> Branch("Time",             &MTime,            "ColTime/F");       // Main cluster time [ticks]
-  fSolarNuAnaTree -> Branch("Charge",           &MChrg,            "ColCharge/F");     // Main cluster charge [ADC*ticks]
-  fSolarNuAnaTree -> Branch("NHits",            &MNHit,            "ColNHits/I");      // Main cluster #hits
   fSolarNuAnaTree -> Branch("TPC",              &MTPC,             "ColTPC/I");        // Main cluster TPC
+  fSolarNuAnaTree -> Branch("Time",             &MTime,            "ColTime/F");       // Main cluster time [ticks]
+  fSolarNuAnaTree -> Branch("NHits",            &MNHit,            "ColNHits/I");      // Main cluster #hits
+  fSolarNuAnaTree -> Branch("Charge",           &MCharge,          "ColCharge/F");     // Main cluster charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("MaxCharge",        &MMaxCharge,       "ColCharge/F");     // Main cluster's max hit-charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("RecoZ",            &MRecZ,            "RecoZ/F");         // Main cluster reco Z [cm]
   fSolarNuAnaTree -> Branch("Ind0TPC",          &MInd0TPC,         "Ind0TPC/I");       // Main cluster ind0 TPC
   fSolarNuAnaTree -> Branch("Ind1TPC",          &MInd1TPC,         "Ind1TPC/I");       // Main cluster ind1 TPC  
+  fSolarNuAnaTree -> Branch("Ind0dT",           &MInd0dT,          "Ind0dT/F");        // Main cluster ind0 dT [Ticks]
+  fSolarNuAnaTree -> Branch("Ind1dT",           &MInd1dT,          "Ind1dT/F");        // Main cluster ind1 dT [Ticks]
   fSolarNuAnaTree -> Branch("Ind0NHits",        &MInd0NHits,       "Ind0NHits/I");     // Main cluster ind0 Hits
   fSolarNuAnaTree -> Branch("Ind1NHits",        &MInd1NHits,       "Ind1NHits/I");     // Main cluster ind1 Hits
-  fSolarNuAnaTree -> Branch("Ind0MaxHit",       &MInd0MaxHit,      "Ind0MaxHit/F");    // Main cluster ind0 MaxHit
-  fSolarNuAnaTree -> Branch("Ind1MaxHit",       &MInd1MaxHit,      "Ind1MaxHit/F");    // Main cluster ind1 MaxHit
-  fSolarNuAnaTree -> Branch("Ind0dT",           &MInd0dT,          "Ind0dT/F");        // Main cluster ind0 DT [Ticks]
-  fSolarNuAnaTree -> Branch("Ind1dT",           &MInd1dT,          "Ind1dT/F");        // Main cluster ind1 DT [Ticks]
+  fSolarNuAnaTree -> Branch("Ind0Charge",       &MInd0Charge,      "Ind0Charge/F");    // Main cluster ind0 MaxHit
+  fSolarNuAnaTree -> Branch("Ind1Charge",       &MInd1Charge,      "Ind1Charge/F");    // Main cluster ind1 MaxHit
+  fSolarNuAnaTree -> Branch("Ind0MaxCharge",    &MInd0MaxCharge,   "Ind0MaxCharge/F"); // Main cluster ind0 MaxHit
+  fSolarNuAnaTree -> Branch("Ind1MaxCharge",    &MInd1MaxCharge,   "Ind1MaxCharge/F"); // Main cluster ind1 MaxHit
   fSolarNuAnaTree -> Branch("Ind0RecoY",        &MInd0RecoY,       "Ind0RecoY/F");     // Main cluster ind0 reco Y [cm]
   fSolarNuAnaTree -> Branch("Ind1RecoY",        &MInd1RecoY,       "Ind1RecoY/F");     // Main cluster ind1 reco Y [cm]
-  fSolarNuAnaTree -> Branch("RecoZ",            &MRecZ,            "RecoZ/F");         // Main cluster reco Z [cm]
   fSolarNuAnaTree -> Branch("MainID",           &MMainID,          "MainID/I");        // Main cluster main track ID
   fSolarNuAnaTree -> Branch("MainT",            &MMainT,           "MainT/I");         // Main cluster main time [ticks]
   fSolarNuAnaTree -> Branch("MainE",            &MMainE,           "MainE/F");         // Main cluster main energy [GeV]
@@ -222,26 +232,34 @@ void SolarNuAna::beginJob(){
   fSolarNuAnaTree -> Branch("MainParentP",      &MMainParentP,     "MainParentP/F");   // Main cluster main parent momentum [GeV]
   fSolarNuAnaTree -> Branch("MainParentT",      &MMainParentT,     "MainParentT/F");   // Main cluster main parent Time [ticks]
   fSolarNuAnaTree -> Branch("MainVertex",       &MMainVertex);                         // Main cluster main particle vertex [cm]
-  fSolarNuAnaTree -> Branch("MainParentVertex", &MMainParentVertex);                   // Main cluster main particle vertex [cm]
+  fSolarNuAnaTree -> Branch("EndVertex",        &MEndVertex);                          // Main cluster end particle vertex [cm]
+  fSolarNuAnaTree -> Branch("MainParentVertex", &MMainParentVertex);                   // Main cluster parent particle vertex [cm]
   fSolarNuAnaTree -> Branch("GenFrac",          &MGenFrac);                            // Main cluster reco purity complete
   fSolarNuAnaTree -> Branch("MarleyFrac",       &MMarleyFrac);                         // Main cluster particle contribution (electron, gamma, neutron)
   // fSolarNuAnaTree -> Branch("Label",          &MGenLabel);                          // Main cluster generator label  
       
   // Adj. Cluster info.
-  fSolarNuAnaTree -> Branch("AdjClGen",       &MAdjClGen);                           // Adj. clusters' generator idx
-  fSolarNuAnaTree -> Branch("AdjClTime",      &MAdjClTime);                          // Adj. clusters' time [ticks]
-  fSolarNuAnaTree -> Branch("AdjClCharge",    &MAdjClCharge);                        // Adj. clusters' charge [ADC*ticks]
-  fSolarNuAnaTree -> Branch("AdjClNHit",      &MAdjClNHit);                          // Adj. clusters' #hits 
-  fSolarNuAnaTree -> Branch("AdjClRecoY",     &MAdjClRecoY);                         // Adj. clusters' reco Y [cm]
-  fSolarNuAnaTree -> Branch("AdjClRecoZ",     &MAdjClRecoZ);                         // Adj. clusters' reco Z [cm]
-  fSolarNuAnaTree -> Branch("AdjClPur",       &MAdjClPur);                           // Adj. clusters' purity
-  fSolarNuAnaTree -> Branch("AdjClR",         &MAdjClR);                             // Adj. clusters' distance [cm]
-  fSolarNuAnaTree -> Branch("AdjClMainID",    &MAdjClMainID);                        // Adj. clusters' main track ID
-  fSolarNuAnaTree -> Branch("AdjClMainPDG",   &MAdjClMainPDG);                       // Adj. clusters' main PDG
-  fSolarNuAnaTree -> Branch("AdjClMainE",     &MAdjClMainE);                         // Adj. clusters' main energy [GeV]
-  fSolarNuAnaTree -> Branch("AdjClMainX",     &MAdjClMainX);                         // Adj. clusters' main X [cm]
-  fSolarNuAnaTree -> Branch("AdjClMainY",     &MAdjClMainY);                         // Adj. clusters' main Y [cm]
-  fSolarNuAnaTree -> Branch("AdjClMainZ",     &MAdjClMainZ);                         // Adj. clusters' main Z [cm]
+  fSolarNuAnaTree -> Branch("AdjClGen",           &MAdjClGen);                           // Adj. clusters' generator idx
+  fSolarNuAnaTree -> Branch("AdjClNHit",          &MAdjClNHit);                          // Adj. clusters' #hits 
+  fSolarNuAnaTree -> Branch("AdjClInd0NHit",      &MAdjClInd0NHit);                      // Adj. clusters' #hits 
+  fSolarNuAnaTree -> Branch("AdjClInd1NHit",      &MAdjClInd1NHit);                      // Adj. clusters' #hits 
+  fSolarNuAnaTree -> Branch("AdjClTime",          &MAdjClTime);                          // Adj. clusters' time [ticks]
+  fSolarNuAnaTree -> Branch("AdjClCharge",        &MAdjClCharge);                        // Adj. clusters' charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("AdjClInd0Charge",    &MAdjClInd0Charge);                    // Adj. clusters' charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("AdjClInd1Charge",    &MAdjClInd1Charge);                    // Adj. clusters' charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("AdjClMaxCharge",     &MAdjClMaxCharge);                     // Adj. clusters' charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("AdjClInd0MaxCharge", &MAdjClInd0MaxCharge);                 // Adj. clusters' charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("AdjClInd1MaxCharge", &MAdjClInd1MaxCharge);                 // Adj. clusters' charge [ADC*ticks]
+  fSolarNuAnaTree -> Branch("AdjClRecoY",         &MAdjClRecoY);                         // Adj. clusters' reco Y [cm]
+  fSolarNuAnaTree -> Branch("AdjClRecoZ",         &MAdjClRecoZ);                         // Adj. clusters' reco Z [cm]
+  fSolarNuAnaTree -> Branch("AdjClR",             &MAdjClR);                             // Adj. clusters' distance [cm]
+  fSolarNuAnaTree -> Branch("AdjClPur",           &MAdjClPur);                           // Adj. clusters' purity
+  fSolarNuAnaTree -> Branch("AdjClMainID",        &MAdjClMainID);                        // Adj. clusters' main track ID
+  fSolarNuAnaTree -> Branch("AdjClMainPDG",       &MAdjClMainPDG);                       // Adj. clusters' main PDG
+  fSolarNuAnaTree -> Branch("AdjClMainE",         &MAdjClMainE);                         // Adj. clusters' main energy [GeV]
+  fSolarNuAnaTree -> Branch("AdjClMainX",         &MAdjClMainX);                         // Adj. clusters' main X [cm]
+  fSolarNuAnaTree -> Branch("AdjClMainY",         &MAdjClMainY);                         // Adj. clusters' main Y [cm]
+  fSolarNuAnaTree -> Branch("AdjClMainZ",         &MAdjClMainZ);                         // Adj. clusters' main Z [cm]
   
   // Adj. Flash info.
   fSolarNuAnaTree -> Branch("AdjOpFlashTime", &MAdjFlashTime);                       // Adj. flash' time [ticks]
@@ -483,9 +501,9 @@ void SolarNuAna::analyze(art::Event const & evt)
 
   std::vector< std::vector< std::vector<float>>> ClGenPur = {{},{},{}};
   std::vector< std::vector< std::vector<recob::Hit>>> AllPlaneClusters = {Clusters0,Clusters1,Clusters2};
-  std::vector< std::vector< float>> ClTotChrg = {{},{},{}}, ClMaxChrg = {{},{},{}}, CldT      = {{},{},{}}, ClT        = {{},{},{}}, ClX   = {{},{},{}}, ClY    = {{},{},{}}, ClZ = {{},{},{}};
-  std::vector< std::vector< float>> ClFracE   = {{},{},{}}, ClFracGa  = {{},{},{}}, ClFracNe  = {{},{},{}}, ClFracRest = {{},{},{}}, ClPur = {{},{},{}}, Cldzdy = {{},{},{}};
-  std::vector< std::vector< int  >> ClMainID  = {{},{},{}}, ClTPC     = {{},{},{}}, ClNHits   = {{},{},{}}, ClGen      = {{},{},{}};
+  std::vector< std::vector< float>> ClCharge = {{},{},{}}, ClMaxCharge = {{},{},{}}, CldT = {{},{},{}}, ClT = {{},{},{}}, ClX = {{},{},{}}, ClY = {{},{},{}}, ClZ = {{},{},{}};
+  std::vector< std::vector< float>> ClFracE = {{},{},{}}, ClFracGa  = {{},{},{}}, ClFracNe = {{},{},{}}, ClFracRest = {{},{},{}}, ClPur = {{},{},{}}, Cldzdy = {{},{},{}};
+  std::vector< std::vector< int  >> ClMainID = {{},{},{}}, ClTPC = {{},{},{}}, ClNHits = {{},{},{}}, ClGen = {{},{},{}};
 
   std::string sRecoObjects = "";
   sRecoObjects = sRecoObjects + "\nTotal number of flashes constructed: " + str(int(flashlist.size()));
@@ -573,8 +591,8 @@ void SolarNuAna::analyze(art::Event const & evt)
       mf::LogDebug("SolarNuAna") << "\ndzdy " << dzdy << " for cluster " << " (" << clustY << ", " << clustZ << ") with track ID " << MainTrID <<  " in plane " << idx; 
       if (clustT < 0) PrintInColor("Negative Cluster Time = " + str(clustT), GetColor("red"));
 
-      ClTotChrg[idx].push_back(ncharge);
-      ClMaxChrg[idx].push_back(maxHit);
+      ClCharge[idx].push_back(ncharge);
+      ClMaxCharge[idx].push_back(maxHit);
       ClNHits[idx].push_back(nhit);
       ClT[idx].push_back(clustT);
       ClTPC[idx].push_back(int(clustTPC));
@@ -598,8 +616,8 @@ void SolarNuAna::analyze(art::Event const & evt)
   
   //-------------------------------------------------------------------- Cluster Matching -------------------------------------------------------------------------// 
   std::vector<std::vector<float>> MVecGenFrac = {};
-  std::vector<int>   MVecNHit  = {}, MVecGen    = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecTPC = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
-  std::vector<float> MVecTime  = {}, MVecChrg   = {}, MVecInd0MaxHit = {}, MVecInd1MaxHit = {}, MVecInd0dT = {}, MVecInd1dT = {};
+  std::vector<int>   MVecNHit = {}, MVecGen = {}, MVecInd0NHits  = {}, MVecInd1NHits  = {}, MVecMainID = {}, MVecTPC = {}, MVecInd0TPC = {}, MVecInd1TPC = {};
+  std::vector<float> MVecTime  = {}, MVecCharge = {}, MVecMaxCharge = {}, MVecInd0Charge = {}, MVecInd1Charge = {}, MVecInd0MaxCharge = {}, MVecInd1MaxCharge = {}, MVecInd0dT = {}, MVecInd1dT = {};
   std::vector<float> MVecInd0RecoY = {}, MVecInd1RecoY = {}, MVecRecY = {}, MVecRecZ = {};
   std::vector<float> MVecFracE = {}, MVecFracGa = {}, MVecFracNe = {}, MVecFracRest = {}, MVecPur = {};
 
@@ -607,18 +625,21 @@ void SolarNuAna::analyze(art::Event const & evt)
     bool match = false;
     int ind0clustNHits = 0, ind1clustNHits = 0;
     int ind0clustTPC = 0, ind1clustTPC = 0;
-    double ind0clustY = -1e6, ind1clustY = -1e6, ind0clustMaxHit = 0, ind1clustMaxHit = 0;
+    double ind0clustY = -1e6, ind1clustY = -1e6, ind0clustMaxCharge = 0, ind1clustMaxCharge = 0, ind0clustCharge = 0, ind1clustCharge = 0;
     double ind0clustdT = fClusterMatchTime, ind1clustdT = fClusterMatchTime;
     if (!AllPlaneClusters[2][ii].empty()){
       if (!AllPlaneClusters[0].empty()){
         for (int jj = 0; jj < int(AllPlaneClusters[0].size()); jj++){
-          if (abs(ClT[2][ii] - ClT[0][jj]) < fClusterMatchTime && abs(fGoalInd0MatchTime - abs(ClT[2][ii] - ClT[0][jj])) < abs(fGoalInd0MatchTime - ind0clustdT)){
+          if ( ClNHits[0][jj] < (1-fClusterMatchNHit)*ClNHits[2][ii] || ClNHits[0][jj] > (1+fClusterMatchNHit)*ClNHits[2][ii]) {continue;}
+          if ( ClCharge[0][jj] < (1-fClusterMatchCharge)*ClCharge[2][ii] || ClCharge[0][jj] > (1+fClusterMatchCharge)*ClCharge[2][ii]) {continue;}
+          if ( abs(ClT[2][ii] - ClT[0][jj]) < fClusterMatchTime && abs(fClusterInd0MatchTime - abs(ClT[2][ii] - ClT[0][jj])) < abs(fClusterInd0MatchTime - ind0clustdT)) {
             ind0clustY = ClY[0][jj] + (ClZ[2][ii] - ClZ[0][jj])/(Cldzdy[0][jj]);
             ind0clustdT = abs(ClT[2][ii] - ClT[0][jj]);
             ind0clustNHits = int(AllPlaneClusters[0][jj].size());
-            ind0clustMaxHit = ClMaxChrg[0][jj];
+            ind0clustCharge = ClCharge[0][jj];
+            ind0clustMaxCharge = ClMaxCharge[0][jj];
             ind0clustTPC = ClTPC[0][jj];
-            if (ind0clustY > -fMaxDetSizeY && ind0clustY < fMaxDetSizeY){match = true;}
+            if (ind0clustY > -fDetectorSizeY && ind0clustY < fDetectorSizeY){match = true;}
             mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster in plane 0 !!! --- Position x = " << ClX[0][jj] << ", y = " << ClY[0][jj] << ", z = " << ClZ[0][jj];
             mf::LogDebug("SolarNuAna") << "Reconstructed position y = " << ind0clustY << ", z = " << ClZ[2][ii];  
           }
@@ -626,13 +647,16 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
       if (!AllPlaneClusters[1].empty()){
         for (int zz = 0; zz < int(AllPlaneClusters[1].size()); zz++){
-          if (abs(ClT[2][ii] - ClT[1][zz]) < fClusterMatchTime && abs(fGoalInd1MatchTime - abs(ClT[2][ii] - ClT[1][zz])) < abs(fGoalInd1MatchTime - ind1clustdT)){
+          if ( ClNHits[1][zz] < (1-fClusterMatchNHit)*ClNHits[2][ii] || ClNHits[1][zz] > (1+fClusterMatchNHit)*ClNHits[2][ii]){continue;}
+          if ( ClCharge[1][zz] < (1-fClusterMatchCharge)*ClCharge[2][ii] || ClCharge[1][zz] > (1+fClusterMatchCharge)*ClCharge[2][ii]){continue;}
+          if ( abs(ClT[2][ii] - ClT[1][zz]) < fClusterMatchTime && abs(fClusterInd1MatchTime - abs(ClT[2][ii] - ClT[1][zz])) < abs(fClusterInd1MatchTime - ind1clustdT)) {
             ind1clustY = ClY[1][zz] + (ClZ[2][ii] - ClZ[1][zz])/(Cldzdy[1][zz]);
             ind1clustdT = abs(ClT[2][ii] - ClT[1][zz]);
             ind1clustNHits = int(AllPlaneClusters[1][zz].size());
-            ind1clustMaxHit = ClMaxChrg[1][zz];
+            ind1clustCharge = ClCharge[1][zz];
+            ind1clustMaxCharge = ClMaxCharge[1][zz];
             ind1clustTPC = ClTPC[1][zz];
-            if (ind1clustY > -fMaxDetSizeY && ind1clustY < fMaxDetSizeY){match = true;}
+            if (ind1clustY > -fDetectorSizeY && ind1clustY < fDetectorSizeY){match = true;}
             mf::LogDebug("SolarNuAna") << "¡¡¡ Matched cluster in plane 1 !!! --- Position x = " << ClX[1][zz] << ", y = " << ClY[1][zz] << ", z = " << ClZ[1][zz];
             mf::LogDebug("SolarNuAna") << "Reconstructed position y = " << ind1clustY << ", z = " << ClZ[2][ii];
           }
@@ -644,7 +668,12 @@ void SolarNuAna::analyze(art::Event const & evt)
     //--------------------------------------------------------- Export Matched cluster vectors ------------------------------------------------------------------// 
     if (match == true){
       // Cluster Charge
-      MVecChrg.push_back(ClTotChrg[2][ii]);
+      MVecCharge.push_back(ClCharge[2][ii]);
+      MVecMaxCharge.push_back(ClMaxCharge[2][ii]);
+      MVecInd0Charge.push_back(ind0clustCharge);
+      MVecInd1Charge.push_back(ind1clustCharge);
+      MVecInd0MaxCharge.push_back(ind0clustMaxCharge);
+      MVecInd1MaxCharge.push_back(ind1clustMaxCharge);
       // Cluster Hits
       MVecNHit.push_back(ClNHits[2][ii]);
       MVecInd0NHits.push_back(ind0clustNHits);
@@ -662,10 +691,6 @@ void SolarNuAna::analyze(art::Event const & evt)
       MVecInd1RecoY.push_back(ind1clustY);
       // Cluster RecoZ	    
       MVecRecZ.push_back(ClZ[2][ii]);
-      // Cluster MaxChargeHit
-      MVecInd0MaxHit.push_back(ind0clustMaxHit);
-      MVecInd1MaxHit.push_back(ind1clustMaxHit);
-
       // Cluster Marley Fractions
       MVecFracE.push_back(ClFracE[2][ii]);
       MVecFracGa.push_back(ClFracGa[2][ii]);
@@ -679,13 +704,13 @@ void SolarNuAna::analyze(art::Event const & evt)
       MVecGenFrac.push_back(ClGenPur[2][ii]);
       
       float buffer = 1;
-      if ((ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY) && (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY)){
+      if ((ind0clustY > -buffer*fDetectorSizeY && ind0clustY < buffer*fDetectorSizeY) && (ind1clustY > -buffer*fDetectorSizeY && ind1clustY < buffer*fDetectorSizeY)){
         mf::LogDebug("SolarNuAna") << "BOTH IND RECO INSIDE OF DETECTOR";
         MVecRecY.push_back((ind0clustY+ind1clustY)/2);}
-      else if (ind0clustY > -buffer*fMaxDetSizeY && ind0clustY < buffer*fMaxDetSizeY){
+      else if (ind0clustY > -buffer*fDetectorSizeY && ind0clustY < buffer*fDetectorSizeY){
         mf::LogDebug("SolarNuAna") << "IND1 OUTSIDE OF DETECTOR";
         MVecRecY.push_back(ind0clustY);}
-      else if (ind1clustY > -buffer*fMaxDetSizeY && ind1clustY < buffer*fMaxDetSizeY){
+      else if (ind1clustY > -buffer*fDetectorSizeY && ind1clustY < buffer*fDetectorSizeY){
         mf::LogDebug("SolarNuAna") << "IND0 OUTSIDE OF DETECTOR";
         MVecRecY.push_back(ind1clustY);}
       else{
@@ -705,8 +730,9 @@ void SolarNuAna::analyze(art::Event const & evt)
   //-------------------------------------------------------------------- Cluster Tree Export -------------------------------------------------------------------------// 
   // Loop over matched clusters and export to tree if number of hits is above threshold
   for (int i = 0; i < int(MVecNHit.size()); i++){
-    if(MVecNHit[i] > fClusterMatchMinNHit && (MVecInd0NHits[i] > fClusterMatchMinNHit || MVecInd1NHits[i] > fClusterMatchMinNHit)){
-      MAdjClTime = {};MAdjClCharge = {};MAdjClNHit = {};MAdjClRecoY = {};MAdjClRecoZ = {};MAdjClR = {};MAdjClPur = {};MAdjClGen = {};MAdjClMainID = {};MAdjClMainPDG = {};
+    if(MVecNHit[i] > fClusterPreselectionNHit && (MVecInd0NHits[i] > fClusterPreselectionNHit || MVecInd1NHits[i] > fClusterPreselectionNHit)){
+      MAdjClTime = {};MAdjClCharge = {};MAdjClInd0Charge = {};MAdjClInd1Charge = {};MAdjClMaxCharge = {};MAdjClInd0MaxCharge = {};MAdjClInd1MaxCharge = {};MAdjClNHit = {};;MAdjClInd0NHit = {};;MAdjClInd1NHit = {};
+      MAdjClRecoY = {};MAdjClRecoZ = {};MAdjClR = {};MAdjClPur = {};MAdjClGen = {};MAdjClMainID = {};MAdjClMainPDG = {};
       MAdjClMainE = {}; MAdjClMainX = {};MAdjClMainY = {};MAdjClMainZ = {};
       MAdjFlashTime = {};MAdjFlashPE = {};MAdjFlashNHit = {};MAdjFlashMaxPE = {};MAdjFlashRecoY = {};MAdjFlashRecoZ = {};MAdjFlashR = {};MAdjFlashPur = {};
       
@@ -718,77 +744,88 @@ void SolarNuAna::analyze(art::Event const & evt)
         + "\n - RecoY/RecoZ (" + str(MVecRecY[i]) + " / " + str(MVecRecZ[i]) + ") Time " + str(MVecTime[i]) + "\n", GetColor(ResultColor));
 
       // Loop over collection plane clusters to find adjacent clusters with distance < fAdjClusterRad and time < fAdjClusterTime
-      for (int j = 0; j < int(MVecNHit.size()); j++){
-        if(j != i && sqrt(pow(MVecRecY[i]-MVecRecY[j],2)+pow(MVecRecZ[i]-MVecRecZ[j],2)) < fAdjClusterRad && abs(MVecTime[i]-MVecTime[j]) < fAdjClusterTime){
-          MAdjClTime.push_back(MVecTime[j]);
-          MAdjClCharge.push_back(MVecChrg[j]);
-          MAdjClNHit.push_back(MVecNHit[j]);
-          MAdjClRecoY.push_back(MVecRecY[j]);
-          MAdjClRecoZ.push_back(MVecRecZ[j]);
-          MAdjClR.push_back(sqrt(pow(MVecRecY[i]-MVecRecY[j],2)+pow(MVecRecZ[i]-MVecRecZ[j],2)));
-          MAdjClPur.push_back(MVecPur[j]);
-          MAdjClGen.push_back(MVecGen[j]);
-          MAdjClMainID.push_back(MVecMainID[j]);
+      for ( int j = 0; j < int(MVecNHit.size()); j++ ){
+        if ( j == i ) {continue;}
+        if ( fGeometry == "HD" && sqrt(pow(MVecRecY[i]-MVecRecY[j],2) + pow(MVecRecZ[i]-MVecRecZ[j],2) + pow((MVecTime[i]-MVecTime[j])*fDetectorSizeX/fAdjOpFlashTime,2)) > fAdjClusterRad ){continue;}
+        if ( fGeometry == "VD" && sqrt(pow(MVecRecY[i]-MVecRecY[j],2) + pow(MVecRecZ[i]-MVecRecZ[j],2) + pow((MVecTime[i]-MVecTime[j])*fDetectorSizeX/(fAdjOpFlashTime/2),2)) > fAdjClusterRad ){continue;}
+        MAdjClTime.push_back(MVecTime[j]);
+        MAdjClCharge.push_back(MVecCharge[j]);
+        MAdjClInd0Charge.push_back(MVecInd0Charge[j]);
+        MAdjClInd1Charge.push_back(MVecInd1Charge[j]);
+        MAdjClMaxCharge.push_back(MVecMaxCharge[j]);
+        MAdjClInd0MaxCharge.push_back(MVecInd0MaxCharge[j]);
+        MAdjClInd1MaxCharge.push_back(MVecInd1MaxCharge[j]);
+        MAdjClNHit.push_back(MVecNHit[j]);
+        MAdjClInd0NHit.push_back(MVecInd0NHits[j]);
+        MAdjClInd1NHit.push_back(MVecInd1NHits[j]);
+        MAdjClRecoY.push_back(MVecRecY[j]);
+        MAdjClRecoZ.push_back(MVecRecZ[j]);
+        MAdjClR.push_back(sqrt(pow(MVecRecY[i]-MVecRecY[j],2)+pow(MVecRecZ[i]-MVecRecZ[j],2)));
+        MAdjClPur.push_back(MVecPur[j]);
+        MAdjClGen.push_back(MVecGen[j]);
+        MAdjClMainID.push_back(MVecMainID[j]);
 
-          // If mother exists add the mother information
-          const simb::MCParticle *MAdjClTruth;
-          int TerminalOutput = supress_stdout();
-          MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
-          resume_stdout(TerminalOutput);
-          if (MAdjClTruth == 0) {
-            MAdjClMainPDG.push_back(0);          
-            MAdjClMainE.push_back(-1e6);
-            MAdjClMainX.push_back(-1e6);
-            MAdjClMainY.push_back(-1e6);
-            MAdjClMainZ.push_back(-1e6);
-          }
-          else{
-            MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
-            MAdjClMainE.push_back(MAdjClTruth->E());
-            MAdjClMainX.push_back(MAdjClTruth->Vx());
-            MAdjClMainY.push_back(MAdjClTruth->Vy());
-            MAdjClMainZ.push_back(MAdjClTruth->Vz());
-          }
+        // If mother exists add the mother information
+        const simb::MCParticle *MAdjClTruth;
+        int TerminalOutput = supress_stdout();
+        MAdjClTruth = pi_serv->TrackIdToParticle_P(MVecMainID[j]);
+        resume_stdout(TerminalOutput);
+        if (MAdjClTruth == 0) {
+          MAdjClMainPDG.push_back(0);          
+          MAdjClMainE.push_back(-1e6);
+          MAdjClMainX.push_back(-1e6);
+          MAdjClMainY.push_back(-1e6);
+          MAdjClMainZ.push_back(-1e6);
+        }
+        else{
+          MAdjClMainPDG.push_back(MAdjClTruth->PdgCode());          
+          MAdjClMainE.push_back(MAdjClTruth->E());
+          MAdjClMainX.push_back(MAdjClTruth->Vx());
+          MAdjClMainY.push_back(MAdjClTruth->Vy());
+          MAdjClMainZ.push_back(MAdjClTruth->Vz());
         }
       }
 
-      // Loop over optical flashes to find adjacent flashes with distance < fAdjOpFlashRad and time < fAdjOpFlashTime
       for (int j = 0; j < int(OpFlashPE.size()); j++){
-        if(sqrt(pow(MVecRecY[i]-OpFlashY[j],2)+pow(MVecRecZ[i]-OpFlashZ[j],2)) < fAdjOpFlashRad  && MVecTime[i] - OpFlashT[j] < fAdjOpFlashTime && MVecTime[i] - OpFlashT[j] > 0){
-          MAdjFlashTime.push_back(OpFlashT[j]);
-          MAdjFlashPE.push_back(OpFlashPE[j]);
-          MAdjFlashNHit.push_back(OpFlashNHit[j]);
-          MAdjFlashMaxPE.push_back(OpFlashMaxPE[j]);
-          MAdjFlashRecoY.push_back(OpFlashY[j]);
-          MAdjFlashRecoZ.push_back(OpFlashZ[j]);
-          MAdjFlashR.push_back(sqrt(pow(MVecRecY[i]-OpFlashY[j],2)+pow(MVecRecZ[i]-OpFlashZ[j],2)));
-          MAdjFlashPur.push_back(OpFlashMarlPur[j]);
-        }
+        if ( (MVecTime[i] - OpFlashT[j]) < 0) {continue;}
+        if ( (MVecTime[i] - OpFlashT[j]) > fAdjOpFlashTime ) {continue;}
+        if ( sqrt(pow(MVecRecY[i]-OpFlashY[j],2)+pow(MVecRecZ[i]-OpFlashZ[j],2)) > fAdjOpFlashRad) {continue;}  
+        MAdjFlashTime.push_back(OpFlashT[j]);
+        MAdjFlashPE.push_back(OpFlashPE[j]);
+        MAdjFlashNHit.push_back(OpFlashNHit[j]);
+        MAdjFlashMaxPE.push_back(OpFlashMaxPE[j]);
+        MAdjFlashRecoY.push_back(OpFlashY[j]);
+        MAdjFlashRecoZ.push_back(OpFlashZ[j]);
+        MAdjFlashR.push_back(sqrt(pow(MVecRecY[i]-OpFlashY[j],2)+pow(MVecRecZ[i]-OpFlashZ[j],2)));
+        MAdjFlashPur.push_back(OpFlashMarlPur[j]);
       }
 
       // Fill the tree with the cluster information and the adjacent clusters and flashes
-      MMarleyFrac = {MVecFracE[i],MVecFracGa[i],MVecFracNe[i],MVecFracRest[i]};
-      MGenFrac =    MVecGenFrac[i];
-      MTime =       MVecTime[i];   
-      MChrg =       MVecChrg[i];   
-      MNHit =       MVecNHit[i];
+      MMarleyFrac =    {MVecFracE[i],MVecFracGa[i],MVecFracNe[i],MVecFracRest[i]};
+      MGenFrac =       MVecGenFrac[i];
+      MTime =          MVecTime[i];   
+      MCharge =        MVecCharge[i];   
+      MMaxCharge =     MVecMaxCharge[i];   
+      MNHit =          MVecNHit[i];
       // Cluster TPC
-      MTPC =        MVecTPC[i];
-      MInd0TPC =    MVecInd0TPC[i];
-      MInd1TPC =    MVecInd1TPC[i];
+      MTPC =           MVecTPC[i];
+      MInd0TPC =       MVecInd0TPC[i];
+      MInd1TPC =       MVecInd1TPC[i];
       // Cluster MaxChargeHit
-      MInd0MaxHit = MVecInd0MaxHit[i];   
-      MInd1MaxHit = MVecInd1MaxHit[i];
-      MInd0NHits =  MVecInd0NHits[i];   
-      MInd1NHits =  MVecInd1NHits[i];
-      MInd0dT =     MVecInd0dT[i];   
-      MInd1dT =     MVecInd1dT[i];   
-      MInd0RecoY =  MVecInd0RecoY[i];   
-      MInd1RecoY =  MVecInd1RecoY[i];   
-      MMainID =     MVecMainID[i];
-      MRecZ =       MVecRecZ[i];   
-      MPur =        MVecPur[i];
-      MGen =        MVecGen[i];
+      MInd0Charge =    MVecInd0Charge[i];   
+      MInd1Charge =    MVecInd1Charge[i];
+      MInd0MaxCharge = MVecInd0MaxCharge[i];   
+      MInd1MaxCharge = MVecInd1MaxCharge[i];
+      MInd0NHits =     MVecInd0NHits[i];   
+      MInd1NHits =     MVecInd1NHits[i];
+      MInd0dT =        MVecInd0dT[i];   
+      MInd1dT =        MVecInd1dT[i];   
+      MInd0RecoY =     MVecInd0RecoY[i];   
+      MInd1RecoY =     MVecInd1RecoY[i];   
+      MMainID =        MVecMainID[i];
+      MRecZ =          MVecRecZ[i];   
+      MPur =           MVecPur[i];
+      MGen =           MVecGen[i];
 
       // If mother exists add the mother information
       const simb::MCParticle *MClTruth;
@@ -797,6 +834,7 @@ void SolarNuAna::analyze(art::Event const & evt)
       resume_stdout(TerminalOutput);
       if (MClTruth == 0){
         MMainVertex = {-1e6,-1e6,-1e6};
+        MEndVertex = {-1e6,-1e6,-1e6};
         MMainPDG =       0;
         MMainE =      -1e6;
         MMainT =      -1e6;
@@ -810,6 +848,7 @@ void SolarNuAna::analyze(art::Event const & evt)
       }
       else{
         MMainVertex = {MClTruth->Vx(),MClTruth->Vy(),MClTruth->Vz()};
+        MEndVertex =  {MClTruth->EndX(),MClTruth->EndY(),MClTruth->EndZ()};
         MMainPDG =    MClTruth->PdgCode();
         MMainE =      MClTruth->E();
         MMainT =      MClTruth->T();
