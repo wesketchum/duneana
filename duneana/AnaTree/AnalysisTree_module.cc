@@ -1439,14 +1439,16 @@ namespace dune {
     void FillShower(
                     AnalysisTreeDataStruct::ShowerDataStruct& showerData,
                     size_t iShower, recob::Shower const& showers, const bool fSavePFParticleInfo,
-            const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+            const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+            const art::FindManyP<recob::PFParticle> fpfp
                     ) const;
 
     /// Stores the information of all showers into showerData
     void FillShowers(
                      AnalysisTreeDataStruct::ShowerDataStruct& showerData,
                      std::vector<recob::Shower> const& showers, const bool fSavePFParticleInfo,
-             const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+             const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+             const art::FindManyP<recob::PFParticle> fpfp
                      ) const;
 
   }; // class dune::AnalysisTree
@@ -4287,25 +4289,27 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
       if (lar_pandora::LArPandoraHelper::IsTrack(pfparticlelist[i])){
         PFParticleData.pfp_isTrack[i] = 1;
-
-        // Set the track ID.
-        auto trackMapIter = pfParticleToTrackMap.find(pfparticlelist[i]);
-        if (trackMapIter != pfParticleToTrackMap.end()) {
-            lar_pandora::TrackVector pfParticleTracks = trackMapIter->second;
-
-            if (pfParticleTracks.size() > 1)
-              std::cerr << "Warning: there was more than one track found for PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
-
-            if (pfParticleTracks.size() > 0) {
-              PFParticleData.pfp_trackID[i] = pfParticleTracks.at(0)->ID();
-              trackIDtoPFParticleIDMap.insert(std::make_pair(pfParticleTracks.at(0)->ID(), pfparticlelist[i]->Self()));
-            }
-        }
-        else
-          std::cerr << "Warning: there was no track found for track-like PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
       }
       else
         PFParticleData.pfp_isTrack[i] = 0;
+
+      // Set the track ID.
+      auto trackMapIter = pfParticleToTrackMap.find(pfparticlelist[i]);
+      if (trackMapIter != pfParticleToTrackMap.end()) {
+          lar_pandora::TrackVector pfParticleTracks = trackMapIter->second;
+
+          if (pfParticleTracks.size() > 1)
+            std::cerr << "Warning: there was more than one track found for PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
+
+          if (pfParticleTracks.size() > 0) {
+            PFParticleData.pfp_trackID[i] = pfParticleTracks.at(0)->ID();
+            trackIDtoPFParticleIDMap.insert(std::make_pair(pfParticleTracks.at(0)->ID(), pfparticlelist[i]->Self()));
+          }
+      }
+      else
+      {
+        std::cerr << "Warning: there was no track found for track-like PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
+      }
 
       if (lar_pandora::LArPandoraHelper::IsShower(pfparticlelist[i])) {
         PFParticleData.pfp_isShower[i] = 1;
@@ -4354,7 +4358,10 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
       art::Handle< std::vector<recob::Shower> > showerHandle = showerListHandle[iShowerAlgo];
 
       if (pShowers){
-        FillShowers(ShowerData, *pShowers, fSavePFParticleInfo, showerIDtoPFParticleIDMap);
+
+        art::FindManyP<recob::PFParticle> fpfp(showerHandle,evt,fShowerModuleLabel[0]);
+        FillShowers(ShowerData, *pShowers, fSavePFParticleInfo, showerIDtoPFParticleIDMap, fpfp);
+
 
         if(fMVAPIDShowerModuleLabel[iShowerAlgo].size()){
           art::FindOneP<anab::MVAPIDResult> fmvapid(showerHandle, evt, fMVAPIDShowerModuleLabel[iShowerAlgo]);
@@ -4580,7 +4587,7 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
         art::FindMany<anab::ParticleID> fmpid(trackListHandle[iTracker], evt, fParticleIDModuleLabel[iTracker]);
         if(fmpid.isValid()) {
           std::vector<const anab::ParticleID*> pids = fmpid.at(iTrk);
-          
+
           for (size_t ipid = 0; ipid < pids.size(); ++ipid){
             if (!pids[ipid]->PlaneID().isValid) continue;
             int planenum = pids[ipid]->PlaneID().Plane;
@@ -5390,10 +5397,13 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
 void dune::AnalysisTree::FillShower( AnalysisTreeDataStruct::ShowerDataStruct& showerData, size_t iShower,
                                      recob::Shower const& shower, const bool fSavePFParticleInfo,
-                                     const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+                                     const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+                                     const art::FindManyP<recob::PFParticle> fpfp
                                      ) const {
 
-  showerData.showerID[iShower]        = shower.ID();
+
+
+  showerData.showerID[iShower]        = iShower;
   showerData.shwr_bestplane[iShower]  = shower.best_plane();
   showerData.shwr_length[iShower]     = shower.Length();
 
@@ -5408,14 +5418,22 @@ void dune::AnalysisTree::FillShower( AnalysisTreeDataStruct::ShowerDataStruct& s
   showerData.shwr_startz[iShower]     = pos_start.Z();
 
   if (fSavePFParticleInfo) {
-    auto mapIter = showerIDtoPFParticleIDMap.find(shower.ID());
-    if (mapIter != showerIDtoPFParticleIDMap.end()) {
-      // This vertex has a corresponding PFParticle.
-      showerData.shwr_hasPFParticle[iShower] = 1;
-      showerData.shwr_PFParticleID[iShower] = mapIter->second;
+    if(!fpfp.isValid())
+    {
+      auto mapIter = showerIDtoPFParticleIDMap.find(shower.ID());
+      if (mapIter != showerIDtoPFParticleIDMap.end()) {
+        // This vertex has a corresponding PFParticle.
+        showerData.shwr_hasPFParticle[iShower] = 1;
+        showerData.shwr_PFParticleID[iShower] = mapIter->second;
+      }
+      else
+        showerData.shwr_hasPFParticle[iShower] = 0;
     }
-    else
-      showerData.shwr_hasPFParticle[iShower] = 0;
+    else{
+      auto pfp = fpfp.at(iShower);
+      showerData.shwr_hasPFParticle[iShower] = 1;
+      showerData.shwr_PFParticleID[iShower] = pfp[0]->Self();
+    }
   }
 
   if (shower.Energy().size() == kNplanes)
@@ -5433,7 +5451,8 @@ void dune::AnalysisTree::FillShower( AnalysisTreeDataStruct::ShowerDataStruct& s
 
 void dune::AnalysisTree::FillShowers( AnalysisTreeDataStruct::ShowerDataStruct& showerData,
                                       std::vector<recob::Shower> const& showers, const bool fSavePFParticleInfo,
-                                      const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+                                      const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+                                      const art::FindManyP<recob::PFParticle> fpfp
                                       ) const {
 
   const size_t NShowers = showers.size();
@@ -5466,7 +5485,7 @@ void dune::AnalysisTree::FillShowers( AnalysisTreeDataStruct::ShowerDataStruct& 
   showerData.nshowers = (Short_t) NShowers;
 
   // set all the showers one by one
-  for (size_t i = 0; i < NShowers; ++i) FillShower(showerData, i, showers[i], fSavePFParticleInfo, showerIDtoPFParticleIDMap);
+  for (size_t i = 0; i < NShowers; ++i)FillShower(showerData, i, showers[i], fSavePFParticleInfo, showerIDtoPFParticleIDMap,fpfp);
 
 } // dune::AnalysisTree::FillShowers()
 
