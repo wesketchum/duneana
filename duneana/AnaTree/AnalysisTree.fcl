@@ -60,6 +60,7 @@ dune35t_analysistree:
  SaveCnnInfo:              false
  SavePFParticleInfo:       true
  G4minE:                   -1
+ RollUpUnsavedIDs:         true
 }
 
 protodune_analysistree:   @local::dune35t_analysistree
