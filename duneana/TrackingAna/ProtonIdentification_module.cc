@@ -454,10 +454,11 @@ void ProtonIdentification::ProtonIdentification::analyze(art::Event const & evt)
 	  trkide[TrackIDs[e].trackID] += TrackIDs[e].energy;
 	}
       }
-      double maxe = -1, tote = 0;
+      // double maxe = -1, tote = 0; // tote unused
+      double maxe = -1;
       int TrackID = -1;
       for (std::map<int,double>::iterator ii = trkide.begin(); ii!=trkide.end(); ++ii){
-	tote += ii->second;
+	// tote += ii->second; // unused
 	if ((ii->second)>maxe){
 	  maxe = ii->second;
 	  TrackID = ii->first;
