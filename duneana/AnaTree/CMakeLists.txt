@@ -6,6 +6,7 @@ art_make( MODULE_LIBRARIES
 	  lardataobj::Simulation
 	  larsim::MCCheater_BackTrackerService_service
 	  larsim::MCCheater_ParticleInventoryService_service
+          larsim::Utils
 	  lardata::Utilities
 	  larevt::Filters
 	  lardataobj::RawData

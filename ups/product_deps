@@ -24,9 +24,9 @@ defaultqual e20
 
 product          version
 cetbuildtools	 v8_20_00	-	only_for_build
-dunereco         v09_78_03d01
-duneopdet        v09_78_03d01
-duneanaobj       v02_04_00
+dunereco         v09_78_06d00
+duneopdet        v09_78_06d00
+duneanaobj       v02_04_00a
 larcoreobj       v09_09_00
 end_product_list
 
@@ -34,8 +34,12 @@ end_product_list
 # We now define allowed qualifiers and the corresponding qualifiers for the depdencies.
 # Make a table by adding columns before "notes".
 qualifier      dunereco   duneopdet  duneanaobj larcoreobj  notes
+c14:debug      c14:debug  c14:debug  c14:debug  c14:debug
+c14:prof       c14:prof   c14:prof   c14:prof   c14:prof
 c7:debug       c7:debug   c7:debug   c7:debug   c7:debug
 c7:prof        c7:prof    c7:prof    c7:prof    c7:prof
+e26:debug      e26:debug  e26:debug  e26:debug  e26:debug
+e26:prof       e26:prof   e26:prof   e26:prof   e26:prof
 e20:debug      e20:debug  e20:debug  e20:debug  e20:debug
 e20:prof       e20:prof   e20:prof   e20:prof   e20:prof
 end_qualifier_list

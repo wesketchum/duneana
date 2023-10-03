@@ -60,6 +60,7 @@
 #include "larcorealg/Geometry/GeometryCore.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 #include "larsim/MCCheater/ParticleInventoryService.h"
+#include "larsim/Utils/TruthMatchUtils.h"
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/RecoBase/Cluster.h"
@@ -1231,7 +1232,7 @@ namespace dune {
   private:
 
     void   HitsPurity(detinfo::DetectorClocksData const& clockData,
-                      std::vector< art::Ptr<recob::Hit> > const& hits, Int_t& trackid, Float_t& purity, double& maxe);
+                      std::vector< art::Ptr<recob::Hit> > const& hits, Int_t& trackid, Float_t& purity, Float_t& compleness, std::map<Int_t,Int_t> HitsToMCCounts);
     double length(const recob::Track& track);
     double driftedLength(detinfo::DetectorPropertiesData const& detProp,
                          const simb::MCParticle& part, TLorentzVector& start, TLorentzVector& end, unsigned int &starti, unsigned int &endi);
@@ -1298,6 +1299,8 @@ namespace dune {
     bool fSavePFParticleInfo; ///whether to extract and save PFParticle information
     bool fSaveSpacePointSolverInfo; ///whether to extract and save SpacePointSolver information
     bool fSaveCnnInfo; ///whether to extract and save CNN information
+    
+    bool fRollUpUnsavedIDs; //whether to squash energy deposits for non-saved G4 particles (e.g. shower secondaries) its saved ancestor particle
 
     std::vector<std::string> fCosmicTaggerAssocLabel;
     std::vector<std::string> fContainmentTaggerAssocLabel;
@@ -1346,8 +1349,8 @@ namespace dune {
         fData->SetBits(AnalysisTreeDataStruct::tdVertex, !fSaveVertexInfo);
         fData->SetBits(AnalysisTreeDataStruct::tdAuxDet, !fSaveAuxDetInfo);
         fData->SetBits(AnalysisTreeDataStruct::tdPFParticle, !fSavePFParticleInfo);
-  fData->SetBits(AnalysisTreeDataStruct::tdSpacePoint, !fSaveSpacePointSolverInfo);
-  fData->SetBits(AnalysisTreeDataStruct::tdCnn, !fSaveCnnInfo);
+        fData->SetBits(AnalysisTreeDataStruct::tdSpacePoint, !fSaveSpacePointSolverInfo);
+        fData->SetBits(AnalysisTreeDataStruct::tdCnn, !fSaveCnnInfo);
       }
       else {
         fData->SetTrackers(GetNTrackers());
@@ -1439,14 +1442,16 @@ namespace dune {
     void FillShower(
                     AnalysisTreeDataStruct::ShowerDataStruct& showerData,
                     size_t iShower, recob::Shower const& showers, const bool fSavePFParticleInfo,
-            const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+            const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+            const art::FindManyP<recob::PFParticle> fpfp
                     ) const;
 
     /// Stores the information of all showers into showerData
     void FillShowers(
                      AnalysisTreeDataStruct::ShowerDataStruct& showerData,
                      std::vector<recob::Shower> const& showers, const bool fSavePFParticleInfo,
-             const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+             const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+             const art::FindManyP<recob::PFParticle> fpfp
                      ) const;
 
   }; // class dune::AnalysisTree
@@ -3387,6 +3392,7 @@ dune::AnalysisTree::AnalysisTree(fhicl::ParameterSet const& pset) :
   fSavePFParticleInfo	    (pset.get< bool >("SavePFParticleInfo", false)),
   fSaveSpacePointSolverInfo (pset.get< bool >("SaveSpacePointSolverInfo", false)),
   fSaveCnnInfo              (pset.get< bool >("SaveCnnInfo", false)),
+  fRollUpUnsavedIDs              (pset.get< bool >("RollUpUnsavedIDs", true)),
   fCosmicTaggerAssocLabel  (pset.get<std::vector< std::string > >("CosmicTaggerAssocLabel") ),
   fContainmentTaggerAssocLabel  (pset.get<std::vector< std::string > >("ContainmentTaggerAssocLabel") ),
   fFlashMatchAssocLabel (pset.get<std::vector< std::string > >("FlashMatchAssocLabel") ),
@@ -4287,25 +4293,27 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
       if (lar_pandora::LArPandoraHelper::IsTrack(pfparticlelist[i])){
         PFParticleData.pfp_isTrack[i] = 1;
-
-        // Set the track ID.
-        auto trackMapIter = pfParticleToTrackMap.find(pfparticlelist[i]);
-        if (trackMapIter != pfParticleToTrackMap.end()) {
-            lar_pandora::TrackVector pfParticleTracks = trackMapIter->second;
-
-            if (pfParticleTracks.size() > 1)
-              std::cerr << "Warning: there was more than one track found for PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
-
-            if (pfParticleTracks.size() > 0) {
-              PFParticleData.pfp_trackID[i] = pfParticleTracks.at(0)->ID();
-              trackIDtoPFParticleIDMap.insert(std::make_pair(pfParticleTracks.at(0)->ID(), pfparticlelist[i]->Self()));
-            }
-        }
-        else
-          std::cerr << "Warning: there was no track found for track-like PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
       }
       else
         PFParticleData.pfp_isTrack[i] = 0;
+
+      // Set the track ID.
+      auto trackMapIter = pfParticleToTrackMap.find(pfparticlelist[i]);
+      if (trackMapIter != pfParticleToTrackMap.end()) {
+          lar_pandora::TrackVector pfParticleTracks = trackMapIter->second;
+
+          if (pfParticleTracks.size() > 1)
+            std::cerr << "Warning: there was more than one track found for PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
+
+          if (pfParticleTracks.size() > 0) {
+            PFParticleData.pfp_trackID[i] = pfParticleTracks.at(0)->ID();
+            trackIDtoPFParticleIDMap.insert(std::make_pair(pfParticleTracks.at(0)->ID(), pfparticlelist[i]->Self()));
+          }
+      }
+      else
+      {
+        std::cerr << "Warning: there was no track found for track-like PFParticle with ID " << pfparticlelist[i]->Self() << std::endl;
+      }
 
       if (lar_pandora::LArPandoraHelper::IsShower(pfparticlelist[i])) {
         PFParticleData.pfp_isShower[i] = 1;
@@ -4354,7 +4362,10 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
       art::Handle< std::vector<recob::Shower> > showerHandle = showerListHandle[iShowerAlgo];
 
       if (pShowers){
-        FillShowers(ShowerData, *pShowers, fSavePFParticleInfo, showerIDtoPFParticleIDMap);
+
+        art::FindManyP<recob::PFParticle> fpfp(showerHandle,evt,fShowerModuleLabel[0]);
+        FillShowers(ShowerData, *pShowers, fSavePFParticleInfo, showerIDtoPFParticleIDMap, fpfp);
+
 
         if(fMVAPIDShowerModuleLabel[iShowerAlgo].size()){
           art::FindOneP<anab::MVAPIDResult> fmvapid(showerHandle, evt, fMVAPIDShowerModuleLabel[iShowerAlgo]);
@@ -4377,6 +4388,22 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
   //track information for multiple trackers
   if (fSaveTrackInfo) {
+
+    // Computing hit to MC association before enter the loop in each track
+    // This is used for the compleness of tracks
+    std::map<int,int> HitsToMCCounts;
+    std::vector<std::map<int,int>> HitsToMCCounts_Planes(kNplanes);
+    if(isMC){
+      for(size_t i = 0; i < hitlist.size(); i++)
+      {
+        TruthMatchUtils::G4ID hitID(TruthMatchUtils::TrueParticleID(clockData, hitlist.at(i), fRollUpUnsavedIDs));
+        ++HitsToMCCounts[hitID];
+        if (hitlist.at(i)->WireID().Plane < kNplanes){
+          ++HitsToMCCounts_Planes[hitlist.at(i)->WireID().Plane][hitID];
+        }
+      }
+    }
+
     for (unsigned int iTracker=0; iTracker < NTrackers; ++iTracker){
       AnalysisTreeDataStruct::TrackDataStruct& TrackerData = fData->GetTrackerData(iTracker);
 
@@ -4580,7 +4607,7 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
         art::FindMany<anab::ParticleID> fmpid(trackListHandle[iTracker], evt, fParticleIDModuleLabel[iTracker]);
         if(fmpid.isValid()) {
           std::vector<const anab::ParticleID*> pids = fmpid.at(iTrk);
-          
+
           for (size_t ipid = 0; ipid < pids.size(); ++ipid){
             if (!pids[ipid]->PlaneID().isValid) continue;
             int planenum = pids[ipid]->PlaneID().Plane;
@@ -4687,51 +4714,31 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
           std::vector< art::Ptr<recob::Hit> > hits[kNplanes];
 
           for(size_t ah = 0; ah < allHits.size(); ++ah){
-            if (/* allHits[ah]->WireID().Plane >= 0 && */ // always true
-                allHits[ah]->WireID().Plane <  3){
+            if (allHits[ah]->WireID().Plane < kNplanes){
               hits[allHits[ah]->WireID().Plane].push_back(allHits[ah]);
             }
           }
-          for (size_t ipl = 0; ipl < 3; ++ipl){
-            double maxe = 0;
-            HitsPurity(clockData, hits[ipl],TrackerData.trkidtruth[iTrk][ipl],TrackerData.trkpurtruth[iTrk][ipl],maxe);
-            //std::cout<<"\n"<<iTracker<<"\t"<<iTrk<<"\t"<<ipl<<"\t"<<trkidtruth[iTracker][iTrk][ipl]<<"\t"<<trkpurtruth[iTracker][iTrk][ipl]<<"\t"<<maxe;
+
+
+          // Computes g4 id corresponding to track using TruthMatchUtils for each plane
+          for (size_t ipl = 0; ipl < kNplanes; ++ipl){
+            HitsPurity(clockData, hits[ipl], TrackerData.trkidtruth[iTrk][ipl],TrackerData.trkpurtruth[iTrk][ipl], TrackerData.trkefftruth[iTrk][ipl], HitsToMCCounts_Planes[ipl]);
             if (TrackerData.trkidtruth[iTrk][ipl]>0){
               const art::Ptr<simb::MCTruth> mc = pi_serv->TrackIdToMCTruth_P(TrackerData.trkidtruth[iTrk][ipl]);
               TrackerData.trkorigin[iTrk][ipl] = mc->Origin();
               const simb::MCParticle *particle = pi_serv->TrackIdToParticle_P(TrackerData.trkidtruth[iTrk][ipl]);
-              double tote = 0;
               const std::vector<const sim::IDE*> vide=bt_serv->TrackIdToSimIDEs_Ps(TrackerData.trkidtruth[iTrk][ipl]);
-              for (auto ide: vide) {
-                tote += ide->energy;
-              }
               TrackerData.trkpdgtruth[iTrk][ipl] = particle->PdgCode();
-              TrackerData.trkefftruth[iTrk][ipl] = maxe/(tote/kNplanes); //tote include both induction and collection energies
-              //std::cout<<"\n"<<trkpdgtruth[iTracker][iTrk][ipl]<<"\t"<<trkefftruth[iTracker][iTrk][ipl];
             }
           }
 
-          double maxe = 0;
-          HitsPurity(clockData, allHits,TrackerData.trkg4id[iTrk],TrackerData.trkpurity[iTrk],maxe);
+          // Computes g4 id corresponding to track using TruthMatchUtils
+          HitsPurity(clockData, allHits,TrackerData.trkg4id[iTrk],TrackerData.trkpurity[iTrk], TrackerData.trkcompleteness[iTrk], HitsToMCCounts);
           if (TrackerData.trkg4id[iTrk]>0){
             const art::Ptr<simb::MCTruth> mc = pi_serv->TrackIdToMCTruth_P(TrackerData.trkg4id[iTrk]);
             TrackerData.trkorig[iTrk] = mc->Origin();
           }
-          if (!allHits.empty() and allHits[0]) {
-            float totenergy = 0.;
-            auto const& all_hits = allHits[0].parentAs<std::vector>();
-            for(recob::Hit const& hit : all_hits) {
-                std::vector<sim::IDE*> ides;
-                //bt_serv->HitToSimIDEs(hit,ides);
-                std::vector<sim::TrackIDE> eveIDs = bt_serv->HitToEveTrackIDEs(clockData, hit);
 
-                for(size_t e = 0; e < eveIDs.size(); ++e){
-                  //std::cout<<h<<" "<<e<<" "<<eveIDs[e].trackID<<" "<<eveIDs[e].energy<<" "<<eveIDs[e].energyFrac<<std::endl;
-                  if (eveIDs[e].trackID==TrackerData.trkg4id[iTrk]) totenergy += eveIDs[e].energy;
-                }
-            }
-            if (totenergy) TrackerData.trkcompleteness[iTrk] = maxe/totenergy;
-          }
         }//end if (isMC)
       }//end loop over track
     }//end loop over track module labels
@@ -5390,10 +5397,13 @@ void dune::AnalysisTree::analyze(const art::Event& evt)
 
 void dune::AnalysisTree::FillShower( AnalysisTreeDataStruct::ShowerDataStruct& showerData, size_t iShower,
                                      recob::Shower const& shower, const bool fSavePFParticleInfo,
-                                     const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+                                     const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+                                     const art::FindManyP<recob::PFParticle> fpfp
                                      ) const {
 
-  showerData.showerID[iShower]        = shower.ID();
+
+
+  showerData.showerID[iShower]        = iShower;
   showerData.shwr_bestplane[iShower]  = shower.best_plane();
   showerData.shwr_length[iShower]     = shower.Length();
 
@@ -5408,14 +5418,22 @@ void dune::AnalysisTree::FillShower( AnalysisTreeDataStruct::ShowerDataStruct& s
   showerData.shwr_startz[iShower]     = pos_start.Z();
 
   if (fSavePFParticleInfo) {
-    auto mapIter = showerIDtoPFParticleIDMap.find(shower.ID());
-    if (mapIter != showerIDtoPFParticleIDMap.end()) {
-      // This vertex has a corresponding PFParticle.
-      showerData.shwr_hasPFParticle[iShower] = 1;
-      showerData.shwr_PFParticleID[iShower] = mapIter->second;
+    if(!fpfp.isValid())
+    {
+      auto mapIter = showerIDtoPFParticleIDMap.find(shower.ID());
+      if (mapIter != showerIDtoPFParticleIDMap.end()) {
+        // This vertex has a corresponding PFParticle.
+        showerData.shwr_hasPFParticle[iShower] = 1;
+        showerData.shwr_PFParticleID[iShower] = mapIter->second;
+      }
+      else
+        showerData.shwr_hasPFParticle[iShower] = 0;
     }
-    else
-      showerData.shwr_hasPFParticle[iShower] = 0;
+    else{
+      auto pfp = fpfp.at(iShower);
+      showerData.shwr_hasPFParticle[iShower] = 1;
+      showerData.shwr_PFParticleID[iShower] = pfp[0]->Self();
+    }
   }
 
   if (shower.Energy().size() == kNplanes)
@@ -5433,7 +5451,8 @@ void dune::AnalysisTree::FillShower( AnalysisTreeDataStruct::ShowerDataStruct& s
 
 void dune::AnalysisTree::FillShowers( AnalysisTreeDataStruct::ShowerDataStruct& showerData,
                                       std::vector<recob::Shower> const& showers, const bool fSavePFParticleInfo,
-                                      const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap
+                                      const std::map<Short_t, Short_t> &showerIDtoPFParticleIDMap,
+                                      const art::FindManyP<recob::PFParticle> fpfp
                                       ) const {
 
   const size_t NShowers = showers.size();
@@ -5466,50 +5485,43 @@ void dune::AnalysisTree::FillShowers( AnalysisTreeDataStruct::ShowerDataStruct& 
   showerData.nshowers = (Short_t) NShowers;
 
   // set all the showers one by one
-  for (size_t i = 0; i < NShowers; ++i) FillShower(showerData, i, showers[i], fSavePFParticleInfo, showerIDtoPFParticleIDMap);
+  for (size_t i = 0; i < NShowers; ++i)FillShower(showerData, i, showers[i], fSavePFParticleInfo, showerIDtoPFParticleIDMap,fpfp);
 
 } // dune::AnalysisTree::FillShowers()
 
 
 
 void dune::AnalysisTree::HitsPurity(detinfo::DetectorClocksData const& clockData,
-                                    std::vector< art::Ptr<recob::Hit> > const& hits, Int_t& trackid, Float_t& purity, double& maxe){
+                                    std::vector< art::Ptr<recob::Hit> > const& hits, Int_t& trackid, Float_t& purity, Float_t& completeness, std::map<Int_t,Int_t> HitsToMCCounts){
 
   trackid = -1;
   purity = -1;
+  completeness = -1;
 
-  art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+  TruthMatchUtils::G4ID g4ID(TruthMatchUtils::TrueParticleIDFromTotalRecoHits(clockData, hits,fRollUpUnsavedIDs));
 
-  std::map<int,double> trkide;
+  if (TruthMatchUtils::Valid(g4ID)){
+    trackid = g4ID;
 
-  for(size_t h = 0; h < hits.size(); ++h){
+    Float_t correct_hits(0.f); // (for complenetess) Count number of hits from the MCParticle with g4ID
 
-    art::Ptr<recob::Hit> hit = hits[h];
-    std::vector<sim::IDE> ides;
-    //bt_serv->HitToSimIDEs(hit,ides);
-    std::vector<sim::TrackIDE> eveIDs = bt_serv->HitToEveTrackIDEs(clockData, hit);
-
-    for(size_t e = 0; e < eveIDs.size(); ++e){
-      //std::cout<<h<<" "<<e<<" "<<eveIDs[e].trackID<<" "<<eveIDs[e].energy<<" "<<eveIDs[e].energyFrac<<std::endl;
-      trkide[eveIDs[e].trackID] += eveIDs[e].energy;
+    // Compute purity using TruthMatchUtils
+    for(size_t i = 0; i < hits.size(); ++i)
+    {
+      TruthMatchUtils::G4ID hitID(TruthMatchUtils::TrueParticleID(clockData, hits.at(i), fRollUpUnsavedIDs));
+      if (hitID == g4ID)
+      {
+        purity+=1.f;
+        correct_hits+=1.f;
+      }
     }
-  }
+    if (hits.size() > 0)
+      purity /= hits.size();
 
-  maxe = -1;
-  double tote = 0;
-  for (std::map<int,double>::iterator ii = trkide.begin(); ii!=trkide.end(); ++ii){
-    tote += ii->second;
-    if ((ii->second)>maxe){
-      maxe = ii->second;
-      trackid = ii->first;
-    }
-  }
-
-  //std::cout << "the total energy of this reco track is: " << tote << std::endl;
-
-  if (tote>0){
-    purity = maxe/tote;
-  }
+    // Compute completeness using TruthMatchUtils counts
+    auto allhitstruth = HitsToMCCounts.find(g4ID)->second;
+    completeness = correct_hits/allhitstruth;
+  }   
 }
 
 // Calculate distance to boundary.
