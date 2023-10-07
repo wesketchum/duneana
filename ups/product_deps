@@ -5,7 +5,7 @@
 
 parent duneana 
 
-defaultqual e20
+defaultqual e26
 
 # These optional lines define where headers, libraries, and executables go and should
 # be used only if your product does not conform to the defaults.
@@ -24,10 +24,10 @@ defaultqual e20
 
 product          version
 cetbuildtools	 v8_20_00	-	only_for_build
-dunereco         v09_78_06d00
-duneopdet        v09_78_06d00
+dunereco         v09_79_00d00
+duneopdet        v09_79_00d00
 duneanaobj       v02_04_00a
-larcoreobj       v09_09_00
+larcoreobj       v09_09_01
 end_product_list
 
 
@@ -36,12 +36,8 @@ end_product_list
 qualifier      dunereco   duneopdet  duneanaobj larcoreobj  notes
 c14:debug      c14:debug  c14:debug  c14:debug  c14:debug
 c14:prof       c14:prof   c14:prof   c14:prof   c14:prof
-c7:debug       c7:debug   c7:debug   c7:debug   c7:debug
-c7:prof        c7:prof    c7:prof    c7:prof    c7:prof
 e26:debug      e26:debug  e26:debug  e26:debug  e26:debug
 e26:prof       e26:prof   e26:prof   e26:prof   e26:prof
-e20:debug      e20:debug  e20:debug  e20:debug  e20:debug
-e20:prof       e20:prof   e20:prof   e20:prof   e20:prof
 end_qualifier_list
 
 # Preserve tabs and formatting in emacs and vi / vim:
