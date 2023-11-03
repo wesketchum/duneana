@@ -97,7 +97,8 @@ private:
 
   bool fMCIsPrimary[kNMaxMCParticles];
   int fMCParticlePdgCode[kNMaxMCParticles];
-  double fMCParticleTrueEnergy [kNMaxMCParticles]; 
+  double fMCParticleTrueEnergy [kNMaxMCParticles];
+  double fMCParticleTrueMom [kNMaxMCParticles]; 
   int fMCParticleTrackID[kNMaxMCParticles]; 
   int fMCParticleParentTrackID[kNMaxMCParticles]; 
   std::string fMCParticleStartProcess[kNMaxMCParticles]; 
@@ -176,6 +177,9 @@ private:
  
   int    fPFPShowerID[kNMaxPFParticles];
   int    fPFPShowerBestPlane[kNMaxPFParticles];
+  double fPFPShowerEnergy[kNMaxPFParticles];
+  double fPFPShowerEnergyToTrueEnergyRatio[kNMaxPFParticles];
+  double fPFPShowerEnergyToTrueMomentumRatio[kNMaxPFParticles];
   double fPFPShowerDirectionX[kNMaxPFParticles];
   double fPFPShowerDirectionY[kNMaxPFParticles];
   double fPFPShowerDirectionZ[kNMaxPFParticles];
@@ -258,6 +262,7 @@ void test::pandoraAnalysis::analyze(art::Event const& e)
       for(unsigned int iMc=0; iMc< mcParticles->size(); iMc++){
         const simb::MCParticle trueParticle = mcParticles->at(iMc);
         fMCParticleTrueEnergy[iMc]=trueParticle.E();
+        fMCParticleTrueMom[iMc]=trueParticle.P();
         fMCParticlePdgCode[iMc]=trueParticle.PdgCode();
         fMCParticleTrackID[iMc]=trueParticle.TrackId();
         fMCParticleVertexTime[iMc]=trueParticle.T();
@@ -441,6 +446,10 @@ void test::pandoraAnalysis::analyze(art::Event const& e)
       fPFPIsShower[iPfp]=true;
       art::Ptr<recob::Shower> shower = dune_ana::DUNEAnaPFParticleUtils::GetShower(pfp,e,fPFParticleLabel, fShowerLabel); 
       fPFPShowerID[iPfp]=shower->ID();
+      const std::vector<double> &energy{shower->Energy()};
+      fPFPShowerEnergy[iPfp]=energy[2] / 1000.;
+      fPFPShowerEnergyToTrueEnergyRatio[iPfp] = -1;
+      fPFPShowerEnergyToTrueMomentumRatio[iPfp] = -1;
       fPFPShowerBestPlane[iPfp]=shower->best_plane();
       fPFPShowerDirectionX[iPfp]=shower->Direction().X();
       fPFPShowerDirectionY[iPfp]=shower->Direction().Y();
@@ -470,11 +479,16 @@ void test::pandoraAnalysis::analyze(art::Event const& e)
         TruthMatchUtils::G4ID g4ID(TruthMatchUtils::TrueParticleIDFromTotalRecoHits(clockData,pfpHits,fRollUpUnsavedIDs));
         if (TruthMatchUtils::Valid(g4ID)){
           fPFPTrueParticleMatchedID[iPfp] = g4ID;
-	  int pos(999999); for(int unsigned ipos=0; ipos<fNMCParticles; ipos++) {
-	    if(fMCParticleTrackID[ipos]==g4ID)pos=ipos;
-  	  }
+	      int pos(999999);
+          for(int unsigned ipos=0; ipos<fNMCParticles; ipos++) {
+	        if(fMCParticleTrackID[ipos]==g4ID)pos=ipos;
+          }
           fPFPTrueParticleMatchedPosition[iPfp] = pos;
+
+          fPFPShowerEnergyToTrueEnergyRatio[iPfp] = fPFPShowerEnergy[iPfp] / fMCParticleTrueEnergy[pos];
+          fPFPShowerEnergyToTrueMomentumRatio[iPfp] = fPFPShowerEnergy[iPfp] / fMCParticleTrueMom[pos];
         }
+
         TruthMatchUtils::G4ID g4IDView0(TruthMatchUtils::TrueParticleIDFromTotalRecoHits(clockData,pfpHitsView0,fRollUpUnsavedIDs));
         if (TruthMatchUtils::Valid(g4ID))
         {
@@ -642,6 +656,9 @@ void test::pandoraAnalysis::beginJob()
 
   fTree->Branch("pfpShowerID",&fPFPShowerID,"PFPShowerID[nPFParticles]/I");
   fTree->Branch("pfpShowerBestPlane",&fPFPShowerBestPlane,"PFPShowerBestPlane[nPFParticles]/I");
+  fTree->Branch("pfpShowerEnergy",&fPFPShowerEnergy,"PFPShowerEnergy[nPFParticles]/D");
+  fTree->Branch("pfpShowerEnergyToTrueEnergyRatio",&fPFPShowerEnergyToTrueEnergyRatio,"PFPShowerEnergyToTrueEnergyRatio[nPFParticles]/D");
+  fTree->Branch("pfpShowerEnergyToTrueMomentumRatio",&fPFPShowerEnergyToTrueMomentumRatio,"PFPShowerEnergyToTrueMomentumRatio[nPFParticles]/D");
   fTree->Branch("pfpShowerDirectionX",&fPFPShowerDirectionX,"PFPShowerDirectionX[nPFParticles]/D");
   fTree->Branch("pfpShowerDirectionY",&fPFPShowerDirectionY,"PFPShowerDirectionY[nPFParticles]/D");
   fTree->Branch("pfpShowerDirectionZ",&fPFPShowerDirectionZ,"PFPShowerDirectionZ[nPFParticles]/D");
@@ -745,6 +762,9 @@ void test::pandoraAnalysis::reset(bool deepClean)
      fPFPTrackNdof[iPfp]=999999;
      
      fPFPShowerID[iPfp]=999999;
+     fPFPShowerEnergy[iPfp]=999999;
+     fPFPShowerEnergyToTrueEnergyRatio[iPfp]=999999;
+     fPFPShowerEnergyToTrueMomentumRatio[iPfp]=999999;
      fPFPShowerBestPlane[iPfp]=999999;
      fPFPShowerDirectionX[iPfp]=999999;
      fPFPShowerDirectionY[iPfp]=999999;
