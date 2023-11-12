@@ -371,29 +371,38 @@ void SolarNuAna::analyze(art::Event const & evt)
       sNuTruth = sNuTruth + "\nMomentumTransfer: " + str(std::sqrt(TNuQSqr)) + " GeV";
       sNuTruth = sNuTruth + "\nPosition (" + str(TNuX) + ", " + str(TNuY) + ", " + str(TNuZ) + ") cm";
       
-      // Save information of each daughter particle of the marley process
-      for ( int i = 0; i < N; i++) {
-        const simb::MCParticle &MarleyParticle = MARLEYtruth.GetParticle(i);
-        int MarleyParticlePDG = MarleyParticle.PdgCode(); MarleyPDGList.push_back(MarleyParticlePDG);
-        int MarleyParticleID  = MarleyParticle.TrackId(); MarleyIDList.push_back(MarleyParticleID);
-        int MarleyParentID    = MarleyParticle.Mother();  MarleyParentIDList.push_back(MarleyParentID);
-        float MarleyParticleE = MarleyParticle.E();       MarleyEList.push_back(MarleyParticleE);
-        float MarleyParticleP = MarleyParticle.P();       MarleyPList.push_back(MarleyParticleP);
-        float MarleyParticleX = MarleyParticle.EndX();    MarleyXList.push_back(MarleyParticleX);
-        float MarleyParticleY = MarleyParticle.EndY();    MarleyYList.push_back(MarleyParticleY);
-        float MarleyParticleZ = MarleyParticle.EndZ();    MarleyZList.push_back(MarleyParticleZ);
-      }
+      // Save information of each daughter particle of the marley process (Moved to next secction due to repeated information!)
+      // for ( int i = 0; i < N; i++) {
+      //   const simb::MCParticle &MarleyParticle = MARLEYtruth.GetParticle(i);
+      //   int MarleyParticlePDG = MarleyParticle.PdgCode(); MarleyPDGList.push_back(MarleyParticlePDG);
+      //   int MarleyParticleID  = MarleyParticle.TrackId(); MarleyIDList.push_back(MarleyParticleID);
+      //   int MarleyParentID    = MarleyParticle.Mother();  MarleyParentIDList.push_back(MarleyParentID);
+      //   float MarleyParticleE = MarleyParticle.E();       MarleyEList.push_back(MarleyParticleE);
+      //   float MarleyParticleP = MarleyParticle.P();       MarleyPList.push_back(MarleyParticleP);
+      //   float MarleyParticleX = MarleyParticle.EndX();    MarleyXList.push_back(MarleyParticleX);
+      //   float MarleyParticleY = MarleyParticle.EndY();    MarleyYList.push_back(MarleyParticleY);
+      //   float MarleyParticleZ = MarleyParticle.EndZ();    MarleyZList.push_back(MarleyParticleZ);
+      // }
     }
     art::FindManyP<simb::MCParticle> MarlAssn(MarlTrue,evt,fGEANTLabel);
-    sNuTruth = sNuTruth + "\nGen.\t PdgCode\t Energy\t\t TrackID \n------------------------------------------------";
+    sNuTruth=sNuTruth+"\nGen.\tPdgCode\tEnergy\t\tEndPosition\n------------------------------------------------";
     
     for ( size_t i = 0; i < MarlAssn.size(); i++) {
       auto parts = MarlAssn.at(i);
       for (auto part = parts.begin(); part != parts.end(); part++) {
+        int MarleyParticlePDG = (*part)->PdgCode(); MarleyPDGList.push_back(MarleyParticlePDG);
+        int MarleyParticleID  = (*part)->TrackId(); MarleyIDList.push_back(MarleyParticleID);
+        int MarleyParentID    = (*part)->Mother();  MarleyParentIDList.push_back(MarleyParentID);
+        float MarleyParticleE = (*part)->E();       MarleyEList.push_back(MarleyParticleE);
+        float MarleyParticleP = (*part)->P();       MarleyPList.push_back(MarleyParticleP);
+        float MarleyParticleX = (*part)->EndX();    MarleyXList.push_back(MarleyParticleX);
+        float MarleyParticleY = (*part)->EndY();    MarleyYList.push_back(MarleyParticleY);
+        float MarleyParticleZ = (*part)->EndZ();    MarleyZList.push_back(MarleyParticleZ);
         signal_trackids.emplace((*part)->TrackId());
 
-        if ((*part)->PdgCode()<1000000){sNuTruth = sNuTruth + "\n" + fLabels[0] + "\t " + str((*part)->PdgCode()) + "\t\t " + str((*part)->E()) + "\t " + str((*part)->TrackId());}
-        else{sNuTruth = sNuTruth + "\n" + fLabels[0] + "\t " + str((*part)->PdgCode()) + "\t " + str((*part)->E()) + "\t " + str((*part)->TrackId());}
+        if ((*part)->PdgCode()<1000000){
+          sNuTruth=sNuTruth+"\n"+fLabels[0]+"\t"+ str((*part)->PdgCode())+"\t\t"+str((*part)->E())+"\t ("+str((*part)->EndX())+", "+str((*part)->EndY())+", "+str((*part)->EndZ())+")";}
+        else{sNuTruth=sNuTruth+"\n"+fLabels[0]+"\t"+str((*part)->PdgCode())+"\t"+str((*part)->E())+"\t ("+str((*part)->EndX())+", "+str((*part)->EndY())+", "+str((*part)->EndZ())+")";}
 
         if ((*part)->PdgCode()==11){ // Electrons
           const TLorentzVector &v4_f = (*part)->EndPosition();
