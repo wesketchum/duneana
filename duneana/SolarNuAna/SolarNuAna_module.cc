@@ -385,7 +385,8 @@ void SolarNuAna::analyze(art::Event const & evt)
       // }
     }
     art::FindManyP<simb::MCParticle> MarlAssn(MarlTrue,evt,fGEANTLabel);
-    sNuTruth=sNuTruth+"\nGen.\tPdgCode\tEnergy\t\tEndPosition\n------------------------------------------------";
+    sNuTruth=sNuTruth+"\nGen.\tPdgCode\t\tEnergy\t\tEndPosition";
+    sNuTruth=sNuTruth+"\n--------------------------------------------------------------------";
     
     for ( size_t i = 0; i < MarlAssn.size(); i++) {
       auto parts = MarlAssn.at(i);
@@ -402,7 +403,7 @@ void SolarNuAna::analyze(art::Event const & evt)
 
         if ((*part)->PdgCode()<1000000){
           sNuTruth=sNuTruth+"\n"+fLabels[0]+"\t"+ str((*part)->PdgCode())+"\t\t"+str((*part)->E())+"\t ("+str((*part)->EndX())+", "+str((*part)->EndY())+", "+str((*part)->EndZ())+")";}
-        else{sNuTruth=sNuTruth+"\n"+fLabels[0]+"\t"+str((*part)->PdgCode())+"\t"+str((*part)->E())+"\t ("+str((*part)->EndX())+", "+str((*part)->EndY())+", "+str((*part)->EndZ())+")";}
+        else{sNuTruth=sNuTruth+"\n"+fLabels[0]+"\t"+str((*part)->PdgCode())+"\t"+str((*part)->E())+"\t\t ("+str((*part)->EndX())+", "+str((*part)->EndY())+", "+str((*part)->EndZ())+")";}
 
         if ((*part)->PdgCode()==11){ // Electrons
           const TLorentzVector &v4_f = (*part)->EndPosition();
