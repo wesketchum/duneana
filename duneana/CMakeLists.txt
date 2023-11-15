@@ -10,3 +10,5 @@ add_subdirectory(ShowerAna)
 add_subdirectory(SolarNuAna)
 add_subdirectory(SupernovaAna)
 add_subdirectory(TrackingAna)
+
+add_subdirectory(TriggerSim)
