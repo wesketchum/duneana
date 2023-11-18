@@ -1,9 +1,4 @@
-cet_build_plugin(TPAlgTPCExample art::tool
-  LIBRARIES
-  fhiclcpp 
-  cetlib::cetlib 
-  cetlib_except
-)
+add_subdirectory(TPAlgTools)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
   dunepdlegacy_Services_ChannelMap_PdspChannelMapService_service
@@ -23,7 +18,6 @@ art_make( BASENAME_ONLY MODULE_LIBRARIES
   messagefacility::MF_MessageLogger
   cetlib::cetlib cetlib_except
   ROOT_BASIC_LIB_LIST
-  EXCLUDE TPAlgTPCExample_tool.cc
 )
 
 

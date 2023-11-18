@@ -8,7 +8,7 @@
 ////////////////////////////////////////////////////////////////////////
 
 
-#include "duneana/TriggerSim/TPAlgTPCTool.hh"
+#include "duneana/TriggerSim/TPAlgTools/TPAlgTPCTool.hh"
 
 #include "detdataformats/trigger/TriggerPrimitive.hpp"
 #include "detdataformats/DetID.hpp"

@@ -4,7 +4,7 @@
 #include "art/Utilities/ToolMacros.h" 
 #include "fhiclcpp/ParameterSet.h" 
 
-#include "duneana/TriggerSim/TPAlgTPCTool.hh"
+#include "duneana/TriggerSim/TPAlgTools/TPAlgTPCTool.hh"
 
 namespace duneana {
 
