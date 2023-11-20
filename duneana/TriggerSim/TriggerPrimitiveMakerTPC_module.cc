@@ -61,7 +61,7 @@ duneana::TriggerPrimitiveMakerTPC::TriggerPrimitiveMakerTPC(fhicl::ParameterSet 
   : EDProducer{p}  // ,
   , rawdigit_tag_(p.get<art::InputTag>("rawdigit_tag"))
   , tpalg_{art::make_tool<TPAlgTPCTool>(p.get<fhicl::ParameterSet>("tpalg"))}
-  , verbosity_(p.get<int>("verbosity"))
+  , verbosity_(p.get<int>("verbosity",0))
 {
   // Call appropriate produces<>() functions here.
   // Call appropriate consumes<>() for any products to be retrieved by this module.

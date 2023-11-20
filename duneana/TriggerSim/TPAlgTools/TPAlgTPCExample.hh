@@ -1,7 +1,6 @@
 #ifndef DUNEANA_TRIGGERSIM_TPALGTPCEXAMPLE_hh
 #define DUNEANA_TRIGGERSIM_TPALGTPCEXAMPLE_hh
 
-#include "art/Utilities/ToolMacros.h" 
 #include "fhiclcpp/ParameterSet.h" 
 
 #include "duneana/TriggerSim/TPAlgTools/TPAlgTPCTool.hh"
@@ -12,7 +11,7 @@ namespace duneana {
 
   public:
     explicit TPAlgTPCExample(fhicl::ParameterSet const& ps) :
-      verbosity_(ps.get<int>("verbosity"))
+      verbosity_(ps.get<int>("verbosity",0))
     {}
 
     void process_waveform(std::vector<short> const& adcs, 
