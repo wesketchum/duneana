@@ -8,7 +8,7 @@
 ////////////////////////////////////////////////////////////////////////
 
 
-//#include "duneana/TriggerSim/TPAlgTools/TPAlgTPCTool.hh"
+#include "duneana/TriggerSim/TAAlgTools/TAAlgTPCTool.hh"
 
 #include "detdataformats/trigger/TriggerActivityData.hpp"
 #include "detdataformats/trigger/TriggerPrimitive.hpp"
@@ -55,7 +55,7 @@ private:
 
   // Declare member data here.
   art::InputTag tp_tag_;
-  //std::unique_ptr<TPAlgTPCTool> tpalg_;
+  std::unique_ptr<TAAlgTPCTool> taalg_;
   int verbosity_;
 
   static bool compareTriggerPrimitive(dunedaq::trgdataformats::TriggerPrimitive tp1,
@@ -66,7 +66,7 @@ private:
 duneana::TriggerActivityMakerTPC::TriggerActivityMakerTPC(fhicl::ParameterSet const& p)
   : EDProducer{p}  // ,
   , tp_tag_(p.get<art::InputTag>("tp_tag"))
-  //, tpalg_{art::make_tool<TPAlgTPCTool>(p.get<fhicl::ParameterSet>("tpalg"))}
+  , taalg_{art::make_tool<TAAlgTPCTool>(p.get<fhicl::ParameterSet>("taalg"))}
   , verbosity_(p.get<int>("verbosity",0))
 {
   // Call appropriate produces<>() functions here.
@@ -105,7 +105,8 @@ void duneana::TriggerActivityMakerTPC::produce(art::Event& e)
     tps_per_rop_map[rop].push_back(tp);
   }
 
-  //now, per map, we need to sort the tps
+  //now, per map, we need to sort the tps by time
+  // and then, can run the TA algorithm.
   for (auto & tps : tps_per_rop_map) {
     std::sort(tps.second.begin(),tps.second.end(),compareTriggerPrimitive);
 
@@ -115,6 +116,14 @@ void duneana::TriggerActivityMakerTPC::produce(art::Event& e)
 		<< tps.second.front().time_start << ", " << tps.second.back().time_start
 		<< "]" << std::endl;
     }
+
+    //initialize our taalg
+    taalg_->initialize();
+
+    //loop through the TPs and process
+    for( auto const& tp : tps.second)
+      taalg_->process_tp(tp,*ta_vec_ptr);
+
   }
 
   e.put(std::move(ta_vec_ptr));

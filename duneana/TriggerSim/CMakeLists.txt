@@ -1,4 +1,5 @@
 add_subdirectory(TPAlgTools)
+add_subdirectory(TAAlgTools)
 
 art_make( BASENAME_ONLY MODULE_LIBRARIES
   dunepdlegacy_Services_ChannelMap_PdspChannelMapService_service
